@@ -31,6 +31,12 @@
 *.out
 *.app
 
+# Python
+*.pyc
+
+# Blender
+*.blend
+
 # Folders
 build/
 output/
