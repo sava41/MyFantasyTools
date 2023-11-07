@@ -1,0 +1,14 @@
+namespace MFT;
+
+struct Vec3 {
+  x:float;
+  y:float;
+  z:float;
+}
+
+table Level {
+  name:string;
+  path:[Vec3];
+}
+
+root_type Level;
