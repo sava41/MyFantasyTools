@@ -2,11 +2,25 @@ import bpy
 import sys
 import math
 import os
+from pathlib import Path
+
+import subprocess
+
+build_mode = "Release"
+bin_path = os.path.abspath('./build/bin/Release/')
+if not os.path.isdir(bin_path):
+    bin_path = os.path.abspath('./build/bin/Debug/')
+    build_mode = "Debug"
+if not os.path.isdir(bin_path):
+    print("binary path not found. Please build project before using tools")
+    quit()
+sys.path.append(bin_path)
 
 working_dir_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(working_dir_path)
 
-import blendertools
+import mft_tools
+import mft_blender
 
 def set_properties(scene: bpy.types.Scene,
                           resolution_percentage: int = 100,
@@ -79,19 +93,26 @@ def setup_cameras() -> bool:
 
     return True
 
-working_dir_path = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(working_dir_path)
+if __name__ == "__main__":
+    if len(sys.argv) != 5:
+        print("Usage: output_path resolution_scale num_sample")
+        sys.exit(1)
 
-# Args
-output_path = str(sys.argv[sys.argv.index('--') + 1])
-resolution_percentage = int(sys.argv[sys.argv.index('--') + 2])
-num_samples = int(sys.argv[sys.argv.index('--') + 3])
+    # Args
+    input_file = (sys.argv[1])
+    output_path = (sys.argv[2])
+    resolution_percentage = int(sys.argv[3])
+    num_samples = int(sys.argv[4])
 
-# Render Settings
-scene = bpy.data.scenes["Scene"]
-set_properties(scene, resolution_percentage)
-set_cycles_renderer(scene, num_samples)
-blendertools.enable_composite_nodes(output_path)
+    bpy.ops.wm.open_mainfile(filepath=input_file)
 
-if setup_cameras():
-    bpy.ops.render.render(animation=True)
+    # Render Settings
+    scene = bpy.data.scenes["Scene"]
+    set_properties(scene, resolution_percentage)
+    set_cycles_renderer(scene, num_samples)
+    mft_blender.enable_composite_nodes(output_path)
+
+    if setup_cameras():
+        bpy.ops.render.render(animation=True)
+
+    bpy.ops.wm.quit_blender()

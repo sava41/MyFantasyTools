@@ -4,29 +4,29 @@ include(FetchContent)
 
 project(MyFantasyTools)
 
+#-------Find Python-------
+find_package(Python 3.10 EXACT COMPONENTS Interpreter Development REQUIRED)
+
 #-------Set Up Third Party Dependencies-------
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/third_party)
 
-message("Downloading libjxl")
+message("Configuring libjxl")
 FetchContent_Declare(
   libjxl
   GIT_REPOSITORY https://github.com/libjxl/libjxl.git
   GIT_TAG v0.8.2
 )
 set(JPEGXL_STATIC true)
-set(JPEGXL_ENABLE_TOOLS true)
 FetchContent_GetProperties(libjxl)
 if(NOT libjxl_POPULATED)
   FetchContent_Populate(libjxl)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
   add_subdirectory(${libjxl_SOURCE_DIR} ${libjxl_BINARY_DIR})
 endif()
 
-#FetchContent_MakeAvailable(libjxl)
-
-message("Downloading flatbuffers")
+message("Configuring flatbuffers")
 FetchContent_Declare(
   flatbuffers
   GIT_REPOSITORY https://github.com/google/flatbuffers.git
@@ -38,14 +38,23 @@ if(NOT flatbuffers_POPULATED)
   add_subdirectory(${flatbuffers_SOURCE_DIR} ${flatbuffers_BINARY_DIR})
 endif()
 
+message("Configuring pybind")
+FetchContent_Declare(
+  pybind
+  GIT_REPOSITORY https://github.com/pybind/pybind11.git
+  GIT_TAG v2.11.1
+)
+FetchContent_GetProperties(pybind)
+if(NOT pybind_POPULATED)
+  FetchContent_Populate(pybind)
+  add_subdirectory(${pybind_SOURCE_DIR} ${pybind_BINARY_DIR})
+endif()
+
+
 #-------Compile MFT Tools and Libraries-------
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-
-file(GLOB_RECURSE MFT_SRCS	
-	"${PROJECT_SOURCE_DIR}/source/*.cpp"
-	"${PROJECT_SOURCE_DIR}/source/*.h")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 # Use flatc to generate files
 set(FBS_FILES ${CMAKE_SOURCE_DIR}/source/flatbuffers/level.fbs)
@@ -59,7 +68,11 @@ add_custom_command(
   COMMENT "Generating FlatBuffers headers from ${FBS_FILES}"
 )
 
-add_executable(MyFantasyTools ${MFT_SRCS} ${GENERATED_DIR}/level_generated.h)
-add_dependencies(MyFantasyTools flatc jxl jxl_threads cjxl)
+add_executable(MyFantasyTools ${PROJECT_SOURCE_DIR}/source/main.cpp ${GENERATED_DIR}/level_generated.h)
+add_dependencies(MyFantasyTools flatc jxl jxl_threads)
 target_include_directories(MyFantasyTools PRIVATE ${GENERATED_DIR})
 target_link_libraries(MyFantasyTools PRIVATE flatbuffers jxl jxl_threads)
+
+pybind11_add_module(mft_tools ${PROJECT_SOURCE_DIR}/source/python_utilities.cpp)
+add_dependencies(mft_tools jxl jxl_threads)
+target_link_libraries(mft_tools PRIVATE jxl jxl_threads)
