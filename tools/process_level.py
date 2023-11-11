@@ -1,10 +1,12 @@
-import bpy
 import sys
 import math
 import os
 from pathlib import Path
+import bpy
+import numpy as np
 
-import subprocess
+os.environ["OPENCV_IO_ENABLE_OPENEXR"]="1"
+import cv2
 
 build_mode = "Release"
 bin_path = os.path.abspath('./build/bin/Release/')
@@ -99,20 +101,29 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Args
-    input_file = (sys.argv[1])
-    output_path = (sys.argv[2])
+    input_file = Path(sys.argv[1])
+    output_path = Path(sys.argv[2])
     resolution_percentage = int(sys.argv[3])
     num_samples = int(sys.argv[4])
 
-    bpy.ops.wm.open_mainfile(filepath=input_file)
+    bpy.ops.wm.open_mainfile(filepath=str(input_file.resolve()))
 
     # Render Settings
     scene = bpy.data.scenes["Scene"]
     set_properties(scene, resolution_percentage)
     set_cycles_renderer(scene, num_samples)
-    mft_blender.enable_composite_nodes(output_path)
+    mft_blender.enable_composite_nodes(str(output_path.resolve()))
 
     if setup_cameras():
         bpy.ops.render.render(animation=True)
 
     bpy.ops.wm.quit_blender()
+
+    # Convert render data to jxl
+    for filename in os.listdir(output_path.resolve()):
+        filepath = output_path / filename
+        if filepath.is_file() and "Color" in filename and ".exr" in filename:
+            print(f"Processing file: {filename}")
+            output_file = output_path / filename.replace("exr", "jxl")
+            img = cv2.imread(str(filepath.resolve()), cv2.IMREAD_ANYCOLOR)
+            mft_tools.save_jxl(img.shape[1], img.shape[0], img.shape[2], img, str(output_file.resolve()))

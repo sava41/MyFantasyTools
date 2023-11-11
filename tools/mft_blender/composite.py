@@ -25,7 +25,7 @@ def enable_composite_nodes(output_path, enabled = True):
         
         output_node.format.file_format = 'OPEN_EXR'
         output_node.format.color_mode = 'RGB'
-        output_node.format.exr_codec = 'NONE'
+        output_node.format.exr_codec = 'ZIP'
         output_node.format.color_depth = '16'
         
         output_node.file_slots.clear()
