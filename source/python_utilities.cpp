@@ -18,6 +18,7 @@ namespace py = pybind11;
 
 bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
                       const uint32_t channels, const void* pixel_data,
+
                       std::vector<uint8_t>& compressed) {
   auto enc = JxlEncoderMake(nullptr);
   auto runner = JxlThreadParallelRunnerMake(
@@ -36,8 +37,8 @@ bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
   JxlEncoderInitBasicInfo(&basic_info);
   basic_info.xsize = xsize;
   basic_info.ysize = ysize;
-  basic_info.bits_per_sample = 16;
-  basic_info.exponent_bits_per_sample = 5;
+  basic_info.bits_per_sample = 32;
+  basic_info.exponent_bits_per_sample = 8;
   basic_info.uses_original_profile = JXL_FALSE;
   basic_info.num_color_channels = channels;
   if (JXL_ENC_SUCCESS != JxlEncoderSetBasicInfo(enc.get(), &basic_info)) {
@@ -46,8 +47,7 @@ bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
   }
 
   JxlColorEncoding color_encoding = {};
-  JxlColorEncodingSetToLinearSRGB(&color_encoding,
-                                  pixel_format.num_channels < 3);
+  JxlColorEncodingSetToLinearSRGB(&color_encoding, channels < 3);
   if (JXL_ENC_SUCCESS !=
       JxlEncoderSetColorEncoding(enc.get(), &color_encoding)) {
     fprintf(stderr, "JxlEncoderSetColorEncoding failed\n");
@@ -107,9 +107,11 @@ bool WriteFile(const std::vector<uint8_t>& bytes, const std::string& path) {
 }
 
 bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
-             const uint32_t channels, py::array_t<float> pixel_data,
+             const uint32_t channels,
+             const py::array_t<float, py::array::c_style |
+                                          py::array::forcecast>& pixel_data,
              const std::string& path) {
-  auto pixel_data_raw = pixel_data.unchecked<3>();
+  auto pixel_data_raw = pixel_data.unchecked<>();
 
   if (pixel_data_raw.size() != xsize * ysize * channels) {
     return false;

@@ -114,16 +114,28 @@ if __name__ == "__main__":
     set_cycles_renderer(scene, num_samples)
     mft_blender.enable_composite_nodes(str(output_path.resolve()))
 
-    if setup_cameras():
-        bpy.ops.render.render(animation=True)
+    #if setup_cameras():
+        #bpy.ops.render.render(animation=True)
 
     bpy.ops.wm.quit_blender()
 
     # Convert render data to jxl
     for filename in os.listdir(output_path.resolve()):
         filepath = output_path / filename
-        if filepath.is_file() and "Color" in filename and ".exr" in filename:
+        if filepath.is_file() and ".exr" in filename:
             print(f"Processing file: {filename}")
             output_file = output_path / filename.replace("exr", "jxl")
-            img = cv2.imread(str(filepath.resolve()), cv2.IMREAD_ANYCOLOR)
-            mft_tools.save_jxl(img.shape[1], img.shape[0], img.shape[2], img, str(output_file.resolve()))
+
+            image_flags = cv2.IMREAD_ANYDEPTH
+            channels = 3
+            
+            if("Color" in filename):
+                image_flags = image_flags | cv2.IMREAD_ANYCOLOR
+            if("Depth" in filename):
+                image_flags = image_flags | cv2.IMREAD_GRAYSCALE 
+                channels = 1
+
+            img = cv2.imread(str(filepath.resolve()), image_flags)
+
+            print(img.shape, channels)
+            mft_tools.save_jxl(img.shape[1], img.shape[0], channels, img, str(output_file.resolve()))
