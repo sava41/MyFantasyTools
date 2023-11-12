@@ -5,16 +5,16 @@ from pathlib import Path
 import bpy
 import numpy as np
 
-os.environ["OPENCV_IO_ENABLE_OPENEXR"]="1"
+os.environ['OPENCV_IO_ENABLE_OPENEXR']='1'
 import cv2
 
-build_mode = "Release"
+build_mode = 'Release'
 bin_path = os.path.abspath('./build/bin/Release/')
 if not os.path.isdir(bin_path):
     bin_path = os.path.abspath('./build/bin/Debug/')
-    build_mode = "Debug"
+    build_mode = 'Debug'
 if not os.path.isdir(bin_path):
-    print("binary path not found. Please build project before using tools")
+    print('binary path not found. Please build project before using tools')
     quit()
 sys.path.append(bin_path)
 
@@ -26,7 +26,7 @@ import mft_blender
 
 def set_properties(scene: bpy.types.Scene,
                           resolution_percentage: int = 100,
-                          output_file_path: str = "",
+                          output_file_path: str = '',
                           res_x: int = 1920,
                           res_y: int = 1080):
     #scene.render.resolution_percentage = resolution_percentage
@@ -54,24 +54,24 @@ def set_cycles_renderer(scene: bpy.types.Scene,
     # Enable GPU acceleration
     # Source - https://blender.stackexchange.com/a/196702
     if prefer_optix_use:
-        bpy.context.scene.cycles.device = "GPU"
+        bpy.context.scene.cycles.device = 'GPU'
 
         # Change the preference setting
-        bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "OPTIX"
+        bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'OPTIX'
 
     # Call get_devices() to let Blender detects GPU device (if any)
-    bpy.context.preferences.addons["cycles"].preferences.get_devices()
+    bpy.context.preferences.addons['cycles'].preferences.get_devices()
 
     # Let Blender use all available devices, include GPU and CPU
-    for d in bpy.context.preferences.addons["cycles"].preferences.devices:
-        d["use"] = 1
+    for d in bpy.context.preferences.addons['cycles'].preferences.devices:
+        d['use'] = 1
 
     # Display the devices to be used for rendering
-    print("----")
-    print("The following devices are avaliable for path tracing:")
-    for device in bpy.context.preferences.addons["cycles"].preferences.devices:
-        print(" - {}".format(device["name"]))
-    print("----")
+    print('----')
+    print('The following devices are avaliable for path tracing:')
+    for device in bpy.context.preferences.addons['cycles'].preferences.devices:
+        print(' - {}'.format(device['name']))
+    print('----')
 
 def setup_cameras() -> bool:
     scene = bpy.context.scene
@@ -80,24 +80,24 @@ def setup_cameras() -> bool:
     
     for ob in scene.objects:
         if ob.type == 'CAMERA':
-            marker = scene.timeline_markers.new("{}-ob.name".format(index), frame=index)
+            marker = scene.timeline_markers.new('{}-ob.name'.format(index), frame=index)
             marker.camera = ob
             
             scene.frame_end = index
             index += 1
 
     if index == 0:
-        print("Error: No cameras found" )
+        print('Error: No cameras found' )
         return False
 
-    print("Found {} cameras. Starting renderer.".format(index) )
-    print("----")
+    print('Found {} cameras. Starting renderer.'.format(index) )
+    print('----')
 
     return True
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     if len(sys.argv) != 5:
-        print("Usage: output_path resolution_scale num_sample")
+        print('Usage: output_path resolution_scale num_sample')
         sys.exit(1)
 
     # Args
@@ -109,10 +109,12 @@ if __name__ == "__main__":
     bpy.ops.wm.open_mainfile(filepath=str(input_file.resolve()))
 
     # Render Settings
-    scene = bpy.data.scenes["Scene"]
+    scene = bpy.data.scenes['Scene']
     set_properties(scene, resolution_percentage)
     set_cycles_renderer(scene, num_samples)
     mft_blender.enable_composite_nodes(str(output_path.resolve()))
+
+    mft_blender.process_navmesh(str(output_path.resolve()), scene)
 
     #if setup_cameras():
         #bpy.ops.render.render(animation=True)
@@ -120,22 +122,22 @@ if __name__ == "__main__":
     bpy.ops.wm.quit_blender()
 
     # Convert render data to jxl
-    for filename in os.listdir(output_path.resolve()):
-        filepath = output_path / filename
-        if filepath.is_file() and ".exr" in filename:
-            print(f"Processing file: {filename}")
-            output_file = output_path / filename.replace("exr", "jxl")
+    # for filename in os.listdir(output_path.resolve()):
+    #     filepath = output_path / filename
+    #     if filepath.is_file() and '.exr' in filename:
+    #         print(f'Processing file: {filename}')
+    #         output_file = output_path / filename.replace('exr', 'jxl')
 
-            image_flags = cv2.IMREAD_ANYDEPTH
-            channels = 3
+    #         image_flags = cv2.IMREAD_ANYDEPTH
+    #         channels = 3
             
-            if("Color" in filename):
-                image_flags = image_flags | cv2.IMREAD_ANYCOLOR
-            if("Depth" in filename):
-                image_flags = image_flags | cv2.IMREAD_GRAYSCALE 
-                channels = 1
+    #         if('Color' in filename):
+    #             image_flags = image_flags | cv2.IMREAD_ANYCOLOR
+    #         if('Depth' in filename):
+    #             image_flags = image_flags | cv2.IMREAD_GRAYSCALE 
+    #             channels = 1
 
-            img = cv2.imread(str(filepath.resolve()), image_flags)
+    #         img = cv2.imread(str(filepath.resolve()), image_flags)
 
-            print(img.shape, channels)
-            mft_tools.save_jxl(img.shape[1], img.shape[0], channels, img, str(output_file.resolve()))
+    #         print(img.shape, channels)
+    #         mft_tools.save_jxl(img.shape[1], img.shape[0], channels, img, str(output_file.resolve()))
