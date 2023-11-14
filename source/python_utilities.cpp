@@ -13,9 +13,6 @@
 namespace mft::python {
 namespace py = pybind11;
 
-#define STRINGIFY(x) #x
-#define MACRO_STRINGIFY(x) STRINGIFY(x)
-
 bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
                       const uint32_t channels, const void* pixel_data,
 
@@ -131,6 +128,9 @@ bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
 
   return true;
 }
+
+#define STRINGIFY(x) #x
+#define MACRO_STRINGIFY(x) STRINGIFY(x)
 
 PYBIND11_MODULE(mft_tools, m) {
   m.doc() = R"pbdoc(
