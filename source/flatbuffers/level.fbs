@@ -46,6 +46,7 @@ table Camera {
 table Level {
   name:string;
   navmesh_verts:[Vec3];
+  navmesh_tris:[Triangle];
 }
 
 root_type Level;

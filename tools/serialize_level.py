@@ -20,7 +20,9 @@ import mft_blender
 
 sys.path.append("./build/generated_flatbuffers/")
 import MFT.Vec3
+import MFT.Camera
 import MFT.Level
+import MFT.Triangle
 
 
 def process_navmesh(scene, output_path):
@@ -28,19 +30,28 @@ def process_navmesh(scene, output_path):
         if ob.type == "MESH" and ob.name.startswith("navmesh_"):
             mft_blender.export_obj(ob, output_path)
             mesh = ob.data
+            mesh.calc_loop_triangles()
             name = ob.name.removeprefix("navmesh_")
 
             builder = flatbuffers.Builder(1024)
 
             level_name = builder.CreateString(name)
 
-            MFT.Level.StartPathVector(builder, len(mesh.vertices))
+            MFT.Level.StartNavmeshVertsVector(builder, len(mesh.vertices))
             for vert in mesh.vertices:
                 MFT.Vec3.CreateVec3(builder, vert.co.x, vert.co.y, vert.co.z)
             navmesh_verts = builder.EndVector()
 
+            MFT.Level.StartNavmeshTrisVector(builder, len(mesh.vertices))
+            for tri in mesh.loop_triangles:
+                MFT.Triangle.CreateTriangle(
+                    builder, tri.vertices[0], tri.vertices[1], tri.vertices[2], 0, 0
+                )
+            navmesh_tris = builder.EndVector()
+
             MFT.Level.Start(builder)
-            MFT.Level.AddPath(builder, navmesh_verts)
+            MFT.Level.AddNavmeshVerts(builder, navmesh_verts)
+            MFT.Level.AddNavmeshTris(builder, navmesh_tris)
             MFT.Level.AddName(builder, level_name)
             level = MFT.Level.End(builder)
 
