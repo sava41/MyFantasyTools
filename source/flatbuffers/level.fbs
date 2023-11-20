@@ -6,9 +6,46 @@ struct Vec3 {
   z:float;
 }
 
+struct Mat4 {
+  m11: float;
+  m12: float;
+  m13: float;
+  m14: float;
+  m21: float;
+  m22: float;
+  m23: float;
+  m24: float;
+  m31: float;
+  m32: float;
+  m33: float;
+  m34: float;
+  m41: float;
+  m42: float;
+  m43: float;
+  m44: float;
+}
+
+struct Triangle {
+  vert1: uint16;
+  vert2: uint16;
+  vert3: uint16;
+  camera_id: uint16;
+  material_id: uint16;
+}
+
+table Camera {
+  name: string;
+  id: uint16;
+  world_transform: Mat4;
+  aspect: float;
+  resX: uint16;
+  resY: uint16;
+  data_path:string;
+}
+
 table Level {
   name:string;
-  path:[Vec3];
+  navmesh_verts:[Vec3];
 }
 
 root_type Level;
