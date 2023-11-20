@@ -61,18 +61,17 @@ set(FBS_FILES ${CMAKE_SOURCE_DIR}/source/flatbuffers/level.fbs)
 set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_flatbuffers)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
-add_custom_command(
-  OUTPUT ${GENERATED_DIR}/level_generated.h
-  COMMAND flatc ARGS --cpp --python -o ${GENERATED_DIR} ${FBS_FILES}
-  DEPENDS flatc ${FBS_FILES}
+add_custom_target(generate_flatbuffers ALL
+  COMMAND flatc --cpp --python -o ${GENERATED_DIR} ${FBS_FILES}
   COMMENT "Generating FlatBuffers headers from ${FBS_FILES}"
 )
+add_dependencies(generate_flatbuffers flatc)
 
-add_executable(MyFantasyTools ${PROJECT_SOURCE_DIR}/source/main.cpp ${GENERATED_DIR}/level_generated.h)
+add_executable(MyFantasyTools ${PROJECT_SOURCE_DIR}/source/main.cpp)
 add_dependencies(MyFantasyTools flatc jxl jxl_threads)
 target_include_directories(MyFantasyTools PRIVATE ${GENERATED_DIR})
 target_link_libraries(MyFantasyTools PRIVATE flatbuffers jxl jxl_threads)
 
 pybind11_add_module(mft_tools ${PROJECT_SOURCE_DIR}/source/python_utilities.cpp)
-add_dependencies(mft_tools jxl jxl_threads)
+add_dependencies(mft_tools jxl jxl_threads generate_flatbuffers)
 target_link_libraries(mft_tools PRIVATE jxl jxl_threads)
