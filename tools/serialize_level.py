@@ -25,7 +25,7 @@ import MFT.Level
 import MFT.Triangle
 
 
-def process_navmesh(scene, output_path):
+def process_navmesh(scene, cameras, output_path):
     for ob in scene.objects:
         if ob.type == "MESH" and ob.name.startswith("navmesh_"):
             mft_blender.export_obj(ob, output_path)

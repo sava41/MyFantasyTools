@@ -118,17 +118,20 @@ if __name__ == "__main__":
     bpy.ops.wm.open_mainfile(filepath=str(input_file.resolve()))
 
     scene = bpy.data.scenes["Scene"]
+    scene.frame_set(0)
+    cameras = mft_blender.create_camera_list(scene, str(output_path.resolve()))
 
     # Serialize Level
-    serialize_level.process_navmesh(scene, str(output_path.resolve()))
+    serialize_level.process_navmesh(scene, cameras, str(output_path.resolve()))
 
     # Render Settings
-    set_properties(scene, resolution_percentage)
     set_cycles_renderer(scene, num_samples)
-    mft_blender.enable_composite_nodes(str(output_path.resolve()))
 
-    # if setup_cameras():
-    #     bpy.ops.render.render(animation=True)
+    # Render
+    for camera in cameras:
+        camera.set_active(scene)
+        mft_blender.set_composite_nodes(camera.output_path)
+        bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
 

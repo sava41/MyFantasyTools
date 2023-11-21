@@ -1,7 +1,7 @@
 import bpy
 
 
-def enable_composite_nodes(output_path, enabled=True):
+def set_composite_nodes(output_path, enabled=True):
     # switch on nodes and get reference
     bpy.context.scene.use_nodes = enabled
 
@@ -28,8 +28,8 @@ def enable_composite_nodes(output_path, enabled=True):
         output_node.format.color_depth = "32"
 
         output_node.file_slots.clear()
-        output_node.file_slots.new("Color")
-        output_node.file_slots.new("Depth")
+        output_node.file_slots.new("Color#")
+        output_node.file_slots.new("Depth#")
 
         output_node.base_path = bpy.path.relpath(output_path)
 
@@ -40,12 +40,12 @@ def enable_composite_nodes(output_path, enabled=True):
         preview_node.format.color_mode = "RGB"
 
         preview_node.file_slots.clear()
-        preview_node.file_slots.new("Preview")
+        preview_node.file_slots.new("Preview#")
 
         preview_node.base_path = bpy.path.relpath(output_path)
 
         # link nodes
         links = tree.links
-        links.new(layer_node.outputs.get("Image"), preview_node.inputs.get("Preview"))
-        links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Color"))
-        links.new(layer_node.outputs.get("Depth"), output_node.inputs.get("Depth"))
+        links.new(layer_node.outputs.get("Image"), preview_node.inputs.get("Preview#"))
+        links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Color#"))
+        links.new(layer_node.outputs.get("Depth"), output_node.inputs.get("Depth#"))
