@@ -1,28 +1,28 @@
 namespace MFT;
 
 struct Vec3 {
-  x:float;
-  y:float;
-  z:float;
+  x: float;
+  y: float;
+  z: float;
 }
 
 struct Mat4 {
+  m00: float;
+  m01: float;
+  m02: float;
+  m03: float;
+  m10: float;
   m11: float;
   m12: float;
   m13: float;
-  m14: float;
+  m20: float;
   m21: float;
   m22: float;
   m23: float;
-  m24: float;
+  m30: float;
   m31: float;
   m32: float;
   m33: float;
-  m34: float;
-  m41: float;
-  m42: float;
-  m43: float;
-  m44: float;
 }
 
 struct Triangle {
@@ -33,20 +33,20 @@ struct Triangle {
   material_id: uint16;
 }
 
-table Camera {
+table View {
   name: string;
-  id: uint16;
   world_transform: Mat4;
   aspect: float;
   resX: uint16;
   resY: uint16;
-  data_path:string;
 }
 
 table Level {
-  name:string;
-  navmesh_verts:[Vec3];
-  navmesh_tris:[Triangle];
+  name: string;
+  data_path: string;
+  views: [View];
+  navmesh_verts: [Vec3];
+  navmesh_tris: [Triangle];
 }
 
 root_type Level;

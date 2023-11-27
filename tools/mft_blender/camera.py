@@ -2,9 +2,8 @@ import bpy
 
 
 class Camera:
-    def __init__(self, object, id, output_path):
+    def __init__(self, object, output_path):
         self.object = object
-        self.id = id
         self.res_x = 1920
         self.res_y = 1080
         self.aspect = float(self.res_y) / float(self.res_x)
@@ -15,19 +14,21 @@ class Camera:
         scene.render.resolution_x = self.res_x
         scene.render.resolution_y = self.res_y
 
-    def get_output_path(self) -> str:
-        return self.output_path
+    def __lt__(self, other):
+        return self.object.data["view_id"] < other.object.data["view_id"]
 
 
 def create_camera_list(scene, output_path) -> list:
     cameras = list()
-    index = 0
     for ob in scene.objects:
         if ob.type == "CAMERA":
-            cameras.append(Camera(ob, index, output_path))
-            index += 1
+            cameras.append(Camera(ob, output_path))
 
-    if index == 0:
+    if len(cameras) == 0:
         print("Error: No cameras found")
+
+    print("Found {} cameras.".format(len(cameras)))
+
+    cameras.sort()
 
     return cameras

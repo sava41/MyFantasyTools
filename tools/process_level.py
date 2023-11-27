@@ -81,29 +81,6 @@ def set_cycles_renderer(
     print("----")
 
 
-def setup_cameras() -> bool:
-    scene = bpy.context.scene
-    index = 0
-    scene.frame_start = 0
-
-    for ob in scene.objects:
-        if ob.type == "CAMERA":
-            marker = scene.timeline_markers.new("{}-ob.name".format(index), frame=index)
-            marker.camera = ob
-
-            scene.frame_end = index
-            index += 1
-
-    if index == 0:
-        print("Error: No cameras found")
-        return False
-
-    print("Found {} cameras. Starting renderer.".format(index))
-    print("----")
-
-    return True
-
-
 if __name__ == "__main__":
     if len(sys.argv) != 5:
         print("Usage: output_path resolution_scale num_sample")
