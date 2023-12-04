@@ -29,7 +29,7 @@ struct Triangle {
   vert1: uint16;
   vert2: uint16;
   vert3: uint16;
-  camera_id: uint16;
+  view_id: uint16;
   material_id: uint16;
 }
 
@@ -39,6 +39,7 @@ table View {
   aspect: float;
   resX: uint16;
   resY: uint16;
+  adjacent_views: [uint16];
 }
 
 table Level {

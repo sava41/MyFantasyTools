@@ -8,6 +8,7 @@ class Camera:
         self.res_y = 1080
         self.aspect = float(self.res_y) / float(self.res_x)
         self.output_path = output_path + "//" + object.name
+        self.adjacent_views = {}
 
     def set_active(self, scene):
         scene.camera = self.object
