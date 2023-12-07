@@ -30,8 +30,8 @@ def process_navmesh(scene, cameras, output_path):
     navmeshes = mft_blender.create_navmesh_list(scene)
 
     if len(navmeshes) > 0:
-        # mft_blender.export_obj(ob, output_path)
         navmesh = navmeshes[0]
+        # mft_blender.export_obj(navmesh.object, output_path)
 
         for i, camera in enumerate(cameras):
             camera.adjacent_views = navmesh.find_adjacent_views(i)
@@ -117,6 +117,9 @@ def process_navmesh(scene, cameras, output_path):
         builder.Finish(level)
 
         buf = builder.Output()
+
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
 
         with open(output_path + "\\" + navmesh.name + ".level", "wb") as file:
             file.write(buf)

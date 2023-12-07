@@ -22,7 +22,7 @@ Build project:
 > mkdir build 
 > cd build 
 > cmake ..
-> cmake --build . --target MyFantasyTools --config <Mode>
+> cmake --build . --target mft_lib mft_tools --config <Mode>
 ```
 
 ### Linux

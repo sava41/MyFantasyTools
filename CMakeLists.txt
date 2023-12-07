@@ -50,7 +50,6 @@ if(NOT pybind_POPULATED)
   add_subdirectory(${pybind_SOURCE_DIR} ${pybind_BINARY_DIR})
 endif()
 
-
 #-------Compile MFT Tools and Libraries-------
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -67,10 +66,10 @@ add_custom_target(generate_flatbuffers ALL
 )
 add_dependencies(generate_flatbuffers flatc)
 
-add_executable(MyFantasyTools ${PROJECT_SOURCE_DIR}/source/main.cpp)
-add_dependencies(MyFantasyTools flatc jxl jxl_threads)
-target_include_directories(MyFantasyTools PRIVATE ${GENERATED_DIR})
-target_link_libraries(MyFantasyTools PRIVATE flatbuffers jxl jxl_threads)
+add_executable(mft_lib ${PROJECT_SOURCE_DIR}/source/main.cpp)
+add_dependencies(mft_lib flatc jxl jxl_threads generate_flatbuffers)
+target_include_directories(mft_lib PRIVATE ${GENERATED_DIR})
+target_link_libraries(mft_lib PRIVATE flatbuffers jxl jxl_threads)
 
 pybind11_add_module(mft_tools ${PROJECT_SOURCE_DIR}/source/python_utilities.cpp)
 add_dependencies(mft_tools jxl jxl_threads generate_flatbuffers)

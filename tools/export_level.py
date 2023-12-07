@@ -1,5 +1,6 @@
 import sys
 import os
+import shutil
 from pathlib import Path
 import bpy
 import numpy as np
@@ -88,18 +89,20 @@ if __name__ == "__main__":
 
     # Args
     input_file = Path(sys.argv[1])
-    output_path = Path(sys.argv[2])
+    output_path_root = Path(sys.argv[2])
     resolution_percentage = int(sys.argv[3])
     num_samples = int(sys.argv[4])
 
     bpy.ops.wm.open_mainfile(filepath=str(input_file.resolve()))
 
+    output_path_final = output_path_root / "data"
+
     scene = bpy.data.scenes["Scene"]
     scene.frame_set(0)
-    cameras = mft_blender.create_camera_list(scene, str(output_path.resolve()))
+    cameras = mft_blender.create_camera_list(scene, str(output_path_root.resolve()))
 
     # Serialize Level
-    serialize_level.process_navmesh(scene, cameras, str(output_path.resolve()))
+    serialize_level.process_navmesh(scene, cameras, str(output_path_final.resolve()))
 
     # Render Settings
     set_cycles_renderer(scene, num_samples)
@@ -107,28 +110,46 @@ if __name__ == "__main__":
     # Render
     for camera in cameras:
         camera.set_active(scene)
-        mft_blender.set_composite_nodes(camera.output_path)
-        bpy.ops.render.render(scene=scene.name)
+        mft_blender.set_composite_nodes(camera.render_output_path)
+        # bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
 
-    # Convert render data to jxl
-    # for filename in os.listdir(output_path.resolve()):
-    #     filepath = output_path / filename
-    #     if filepath.is_file() and '.exr' in filename:
-    #         print(f'Processing file: {filename}')
-    #         output_file = output_path / filename.replace('exr', 'jxl')
+    if not (output_path_final / "views").exists():
+        os.makedirs(output_path_final / "views")
 
-    #         image_flags = cv2.IMREAD_ANYDEPTH
-    #         channels = 3
+    for camera in cameras:
+        for filename in os.listdir(camera.render_output_path):
+            filepath = Path(camera.render_output_path) / filename
+            if filepath.is_file() and ".exr" in filename:
+                output_file = (
+                    camera.object.name + "_" + filename.replace("0.exr", ".jxl")
+                )
+                output_file_path = output_path_final / "views" / output_file
 
-    #         if('Color' in filename):
-    #             image_flags = image_flags | cv2.IMREAD_ANYCOLOR
-    #         if('Depth' in filename):
-    #             image_flags = image_flags | cv2.IMREAD_GRAYSCALE
-    #             channels = 1
+                print(f"Processing file: {output_file}")
 
-    #         img = cv2.imread(str(filepath.resolve()), image_flags)
+                image_flags = cv2.IMREAD_ANYDEPTH
+                channels = 3
 
-    #         print(img.shape, channels)
-    #         mft_tools.save_jxl(img.shape[1], img.shape[0], channels, img, str(output_file.resolve()))
+                if "Color" in filename:
+                    image_flags = image_flags | cv2.IMREAD_ANYCOLOR
+                if "Depth" in filename:
+                    image_flags = image_flags | cv2.IMREAD_GRAYSCALE
+                    channels = 1
+
+                img = cv2.imread(str(filepath.resolve()), image_flags)
+
+                # TODO: save_jxl may hit jxl assert if compiled in debug
+                mft_tools.save_jxl(
+                    img.shape[1],
+                    img.shape[0],
+                    channels,
+                    img,
+                    str(output_file_path.resolve()),
+                )
+
+    # Zip data
+    shutil.make_archive(
+        str((output_path_root / "mft_level_data").resolve()), format="zip", root_dir=str(output_path_final.resolve())
+    )
