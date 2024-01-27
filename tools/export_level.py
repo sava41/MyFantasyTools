@@ -111,7 +111,7 @@ if __name__ == "__main__":
     for camera in cameras:
         camera.set_active(scene)
         mfblender.set_composite_nodes(camera.render_output_path)
-        # bpy.ops.render.render(scene=scene.name)
+        bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
 
@@ -119,6 +119,9 @@ if __name__ == "__main__":
         os.makedirs(output_path_final / "views")
 
     for camera in cameras:
+        if not Path(camera.render_output_path).exists():
+            print("Render does not exist: " + camera.render_output_path)
+            continue
         for filename in os.listdir(camera.render_output_path):
             filepath = Path(camera.render_output_path) / filename
             if filepath.is_file() and ".exr" in filename:
