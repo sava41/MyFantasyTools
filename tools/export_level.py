@@ -21,8 +21,8 @@ sys.path.append(bin_path)
 working_dir_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(working_dir_path)
 
-import mft_tools
-import mft_blender
+import mftools
+import mfblender
 import serialize_level
 
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
     scene = bpy.data.scenes["Scene"]
     scene.frame_set(0)
-    cameras = mft_blender.create_camera_list(scene, str(output_path_root.resolve()))
+    cameras = mfblender.create_camera_list(scene, str(output_path_root.resolve()))
 
     # Serialize Level
     serialize_level.process_navmesh(scene, cameras, str(output_path_final.resolve()))
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     # Render
     for camera in cameras:
         camera.set_active(scene)
-        mft_blender.set_composite_nodes(camera.render_output_path)
+        mfblender.set_composite_nodes(camera.render_output_path)
         # bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                 img = cv2.imread(str(filepath.resolve()), image_flags)
 
                 # TODO: save_jxl may hit jxl assert if compiled in debug
-                mft_tools.save_jxl(
+                mftools.save_jxl(
                     img.shape[1],
                     img.shape[0],
                     channels,
@@ -151,5 +151,7 @@ if __name__ == "__main__":
 
     # Zip data
     shutil.make_archive(
-        str((output_path_root / "mft_level_data").resolve()), format="zip", root_dir=str(output_path_final.resolve())
+        str((output_path_root / "mft_level_data").resolve()),
+        format="zip",
+        root_dir=str(output_path_final.resolve()),
     )

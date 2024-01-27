@@ -132,12 +132,12 @@ bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
 
-PYBIND11_MODULE(mft_tools, m) {
+PYBIND11_MODULE(mftools, m) {
   m.doc() = R"pbdoc(
             Pybind11 example plugin
             -----------------------
 
-            .. currentmodule:: mft_tools
+            .. currentmodule:: mftools
 
             .. autosummary::
             :toctree: _generate

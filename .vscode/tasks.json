@@ -6,7 +6,8 @@
 			"label": "CMake: build",
 			"command": "build",
 			"targets": [
-				"mft_tools"
+				"mftools",
+				"mflib"
 			],
 			"group": {
 				"kind": "build",

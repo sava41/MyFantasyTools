@@ -15,8 +15,8 @@ sys.path.append(bin_path)
 working_dir_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(working_dir_path)
 
-import mft_tools
-import mft_blender
+import mftools
+import mfblender
 
 sys.path.append("./build/generated_flatbuffers/")
 import MFT.Vec3
@@ -27,11 +27,11 @@ import MFT.Triangle
 
 
 def process_navmesh(scene, cameras, output_path):
-    navmeshes = mft_blender.create_navmesh_list(scene)
+    navmeshes = mfblender.create_navmesh_list(scene)
 
     if len(navmeshes) > 0:
         navmesh = navmeshes[0]
-        # mft_blender.export_obj(navmesh.object, output_path)
+        # mfblender.export_obj(navmesh.object, output_path)
 
         for i, camera in enumerate(cameras):
             camera.adjacent_views = navmesh.find_adjacent_views(i)
