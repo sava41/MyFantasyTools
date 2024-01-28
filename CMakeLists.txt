@@ -55,22 +55,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-# Use flatc to generate files
-set(FBS_FILES ${CMAKE_SOURCE_DIR}/source/flatbuffers/level.fbs)
-set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated_flatbuffers)
+set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
-add_custom_target(generate_flatbuffers ALL
-  COMMAND flatc --cpp --python -o ${GENERATED_DIR} ${FBS_FILES}
-  COMMENT "Generating FlatBuffers headers from ${FBS_FILES}"
-)
-add_dependencies(generate_flatbuffers flatc)
-
-add_executable(mflib ${PROJECT_SOURCE_DIR}/source/main.cpp)
-add_dependencies(mflib flatc jxl-static jxl_threads-static generate_flatbuffers)
-target_include_directories(mflib PRIVATE ${GENERATED_DIR})
-target_link_libraries(mflib PRIVATE flatbuffers jxl-static jxl_threads-static)
-
-pybind11_add_module(mftools ${PROJECT_SOURCE_DIR}/source/python_utilities.cpp)
-add_dependencies(mftools jxl-static jxl_threads-static generate_flatbuffers)
-target_link_libraries(mftools PRIVATE jxl-static jxl_threads-static)
+add_subdirectory(source/flatbuffers)
+add_subdirectory(source/library)
+add_subdirectory(source/utilities)
