@@ -5,7 +5,7 @@
             "name": "Run level generator",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}\\tools\\process_level.py",
+            "program": "${workspaceFolder}\\tools\\export_level.py",
             "cwd": "${workspaceFolder}",
             "args": [
                 "./level.blend",
