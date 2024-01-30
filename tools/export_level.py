@@ -5,6 +5,9 @@ from pathlib import Path
 import bpy
 import numpy as np
 
+if sys.version_info[0] != 3 and sys.version_info[1] != 10:
+    raise Exception("Must be using Python 3.10")
+
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2
 
