@@ -3,6 +3,7 @@
 #pragma once
 
 namespace mft {
+
 class LevelManager {
  public:
   LevelManager() = default;

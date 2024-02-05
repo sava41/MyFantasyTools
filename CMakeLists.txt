@@ -59,5 +59,6 @@ set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
 add_subdirectory(source/flatbuffers)
-add_subdirectory(source/library)
 add_subdirectory(source/utilities)
+add_subdirectory(source/python)
+add_subdirectory(source/library)

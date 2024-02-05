@@ -10,13 +10,14 @@
 #include <string>
 #include <vector>
 
-namespace mft::python {
+#include "io.h"
+
+namespace mft {
 namespace py = pybind11;
 
 bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
                       const uint32_t channels, const void* pixel_data,
-
-                      std::vector<uint8_t>& compressed) {
+                      std::vector<char>& compressed) {
   auto enc = JxlEncoderMake(nullptr);
   auto runner = JxlThreadParallelRunnerMake(
       nullptr, JxlThreadParallelRunnerDefaultNumWorkerThreads());
@@ -63,43 +64,25 @@ bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
   JxlEncoderCloseInput(enc.get());
 
   compressed.resize(64);
-  uint8_t* next_out = compressed.data();
-  size_t avail_out = compressed.size() - (next_out - compressed.data());
+  uint8_t* next_out = reinterpret_cast<uint8_t*>(compressed.data());
+  size_t avail_out = compressed.size() -
+                     (next_out - reinterpret_cast<uint8_t*>(compressed.data()));
   JxlEncoderStatus process_result = JXL_ENC_NEED_MORE_OUTPUT;
   while (process_result == JXL_ENC_NEED_MORE_OUTPUT) {
     process_result = JxlEncoderProcessOutput(enc.get(), &next_out, &avail_out);
     if (process_result == JXL_ENC_NEED_MORE_OUTPUT) {
-      size_t offset = next_out - compressed.data();
+      size_t offset = next_out - reinterpret_cast<uint8_t*>(compressed.data());
       compressed.resize(compressed.size() * 2);
-      next_out = compressed.data() + offset;
+      next_out = reinterpret_cast<uint8_t*>(compressed.data()) + offset;
       avail_out = compressed.size() - offset;
     }
   }
-  compressed.resize(next_out - compressed.data());
+  compressed.resize(next_out - reinterpret_cast<uint8_t*>(compressed.data()));
   if (JXL_ENC_SUCCESS != process_result) {
     fprintf(stderr, "JxlEncoderProcessOutput failed\n");
     return false;
   }
 
-  return true;
-}
-
-bool WriteFile(const std::vector<uint8_t>& bytes, const std::string& path) {
-  FILE* file = fopen(path.c_str(), "wb");
-  if (!file) {
-    fprintf(stderr, "Could not open %s for writing\n", path.c_str());
-    return false;
-  }
-  if (fwrite(bytes.data(), sizeof(uint8_t), bytes.size(), file) !=
-      bytes.size()) {
-    fprintf(stderr, "Could not write bytes to %s\n", path.c_str());
-    fclose(file);
-    return false;
-  }
-  if (fclose(file) != 0) {
-    fprintf(stderr, "Could not close %s\n", path.c_str());
-    return false;
-  }
   return true;
 }
 
@@ -114,7 +97,7 @@ bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
     return false;
   }
 
-  std::vector<uint8_t> compressed;
+  std::vector<char> compressed;
 
   if (!EncodeJxlOneshot(xsize, ysize, channels,
                         static_cast<const void*>(pixel_data_raw.data(0, 0, 0)),
@@ -122,7 +105,7 @@ bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
     return false;
   }
 
-  if (!WriteFile(compressed, path)) {
+  if (!WriteBinary(path, compressed)) {
     return false;
   }
 
@@ -158,4 +141,4 @@ PYBIND11_MODULE(mftools, m) {
 #endif
 }
 
-}  // namespace mft::python
+}  // namespace mft

@@ -1,3 +1,4 @@
-pybind11_add_module(mftools python_utilities.cpp)
-add_dependencies(mftools jxl-static jxl_threads-static generate_flatbuffers)
-target_link_libraries(mftools PRIVATE jxl-static jxl_threads-static)
+file(GLOB sources "*.cpp" "*.h")
+
+add_library(mfutilities STATIC ${sources})
+target_include_directories(mfutilities PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
