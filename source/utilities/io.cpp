@@ -9,12 +9,12 @@ bool WriteBinary(const std::filesystem::path& binPath,
                  const std::vector<char>& buffer) {
   std::ofstream binary(binPath, std::ios::binary);
 
-  binary.write(buffer.data(), buffer.size());
-
   bool res = true;
   if (!binary.good()) {
     fprintf(stderr, "Could not write %s\n", binPath.string().c_str());
     res = false;
+  } else {
+    binary.write(buffer.data(), buffer.size());
   }
 
   binary.close();

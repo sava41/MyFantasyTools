@@ -1,8 +1,5 @@
 
-#include <jxl/encode.h>
-#include <jxl/encode_cxx.h>
-#include <jxl/thread_parallel_runner.h>
-#include <jxl/thread_parallel_runner_cxx.h>
+
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
@@ -11,80 +8,10 @@
 #include <vector>
 
 #include "io.h"
+#include "jxl.h"
 
 namespace mft {
 namespace py = pybind11;
-
-bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
-                      const uint32_t channels, const void* pixel_data,
-                      std::vector<char>& compressed) {
-  auto enc = JxlEncoderMake(nullptr);
-  auto runner = JxlThreadParallelRunnerMake(
-      nullptr, JxlThreadParallelRunnerDefaultNumWorkerThreads());
-  if (JXL_ENC_SUCCESS != JxlEncoderSetParallelRunner(enc.get(),
-                                                     JxlThreadParallelRunner,
-                                                     runner.get())) {
-    fprintf(stderr, "JxlEncoderSetParallelRunner failed\n");
-    return false;
-  }
-
-  JxlPixelFormat pixel_format = {channels, JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN,
-                                 0};
-
-  JxlBasicInfo basic_info;
-  JxlEncoderInitBasicInfo(&basic_info);
-  basic_info.xsize = xsize;
-  basic_info.ysize = ysize;
-  basic_info.bits_per_sample = 32;
-  basic_info.exponent_bits_per_sample = 8;
-  basic_info.uses_original_profile = JXL_FALSE;
-  basic_info.num_color_channels = channels;
-  if (JXL_ENC_SUCCESS != JxlEncoderSetBasicInfo(enc.get(), &basic_info)) {
-    fprintf(stderr, "JxlEncoderSetBasicInfo failed\n");
-    return false;
-  }
-
-  JxlColorEncoding color_encoding = {};
-  JxlColorEncodingSetToLinearSRGB(&color_encoding, channels < 3);
-  if (JXL_ENC_SUCCESS !=
-      JxlEncoderSetColorEncoding(enc.get(), &color_encoding)) {
-    fprintf(stderr, "JxlEncoderSetColorEncoding failed\n");
-    return false;
-  }
-
-  JxlEncoderFrameSettings* frame_settings =
-      JxlEncoderFrameSettingsCreate(enc.get(), nullptr);
-
-  if (JXL_ENC_SUCCESS !=
-      JxlEncoderAddImageFrame(frame_settings, &pixel_format, pixel_data,
-                              sizeof(float) * xsize * ysize * channels)) {
-    fprintf(stderr, "JxlEncoderAddImageFrame failed\n");
-    return false;
-  }
-  JxlEncoderCloseInput(enc.get());
-
-  compressed.resize(64);
-  uint8_t* next_out = reinterpret_cast<uint8_t*>(compressed.data());
-  size_t avail_out = compressed.size() -
-                     (next_out - reinterpret_cast<uint8_t*>(compressed.data()));
-  JxlEncoderStatus process_result = JXL_ENC_NEED_MORE_OUTPUT;
-  while (process_result == JXL_ENC_NEED_MORE_OUTPUT) {
-    process_result = JxlEncoderProcessOutput(enc.get(), &next_out, &avail_out);
-    if (process_result == JXL_ENC_NEED_MORE_OUTPUT) {
-      size_t offset = next_out - reinterpret_cast<uint8_t*>(compressed.data());
-      compressed.resize(compressed.size() * 2);
-      next_out = reinterpret_cast<uint8_t*>(compressed.data()) + offset;
-      avail_out = compressed.size() - offset;
-    }
-  }
-  compressed.resize(next_out - reinterpret_cast<uint8_t*>(compressed.data()));
-  if (JXL_ENC_SUCCESS != process_result) {
-    fprintf(stderr, "JxlEncoderProcessOutput failed\n");
-    return false;
-  }
-
-  return true;
-}
 
 bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
              const uint32_t channels,
