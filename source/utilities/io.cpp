@@ -7,10 +7,9 @@ namespace mft {
 
 bool WriteBinary(const std::filesystem::path& binPath,
                  const std::vector<char>& buffer) {
-  std::ofstream binary;
-  binary.open(binPath);
+  std::ofstream binary(binPath, std::ios::binary);
 
-  binary.write(buffer.data(), std::ios::out | std::ios::binary);
+  binary.write(buffer.data(), buffer.size());
 
   bool res = true;
   if (!binary.good()) {
