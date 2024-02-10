@@ -135,15 +135,14 @@ bool DecodeOneShot(const uint8_t* jxl, size_t size, std::vector<float>* pixels,
       // Get the ICC color profile of the pixel data
       size_t icc_size;
       if (JXL_DEC_SUCCESS !=
-          JxlDecoderGetICCProfileSize(
-              dec.get(), &format, JXL_COLOR_PROFILE_TARGET_DATA, &icc_size)) {
+          JxlDecoderGetICCProfileSize(dec.get(), JXL_COLOR_PROFILE_TARGET_DATA,
+                                      &icc_size)) {
         fprintf(stderr, "JxlDecoderGetICCProfileSize failed\n");
         return false;
       }
       iccProfile.resize(icc_size);
       if (JXL_DEC_SUCCESS != JxlDecoderGetColorAsICCProfile(
-                                 dec.get(), &format,
-                                 JXL_COLOR_PROFILE_TARGET_DATA,
+                                 dec.get(), JXL_COLOR_PROFILE_TARGET_DATA,
                                  iccProfile.data(), iccProfile.size())) {
         fprintf(stderr, "JxlDecoderGetColorAsICCProfile failed\n");
         return false;
