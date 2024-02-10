@@ -26,9 +26,9 @@ bool SaveJxl(const uint32_t xsize, const uint32_t ysize,
 
   std::vector<char> compressed;
 
-  if (!EncodeJxlOneshot(xsize, ysize, channels,
-                        static_cast<const void*>(pixel_data_raw.data(0, 0, 0)),
-                        compressed)) {
+  if (!jxl::EncodeOneshot(
+          xsize, ysize, channels,
+          static_cast<const void*>(pixel_data_raw.data(0, 0, 0)), compressed)) {
     return false;
   }
 

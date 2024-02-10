@@ -2,9 +2,14 @@
 
 #include <vector>
 
-namespace mft {
+namespace mft::jxl {
 
-bool EncodeJxlOneshot(const uint32_t xsize, const uint32_t ysize,
-                      const uint32_t channels, const void* pixelData,
-                      std::vector<char>& compressed);
-}
+bool EncodeOneshot(const uint32_t xsize, const uint32_t ysize,
+                   const uint32_t channels, const void* pixelData,
+                   std::vector<char>& compressed);
+
+bool DecodeOneShot(const uint8_t* jxl, size_t size, std::vector<float>* pixels,
+                   size_t& xsize, size_t& ysize,
+                   std::vector<uint8_t>& iccProfile);
+
+}  // namespace mft::jxl
