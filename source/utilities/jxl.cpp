@@ -84,7 +84,7 @@ bool EncodeOneshot(const uint32_t xsize, const uint32_t ysize,
   return true;
 }
 
-bool DecodeOneShot(const uint8_t* jxl, size_t size, std::vector<float>* pixels,
+bool DecodeOneShot(std::vector<char>& compressed, std::vector<float>& pixels,
                    size_t& xsize, size_t& ysize,
                    std::vector<uint8_t>& iccProfile) {
   // Multi-threaded parallel runner.
@@ -109,7 +109,8 @@ bool DecodeOneShot(const uint8_t* jxl, size_t size, std::vector<float>* pixels,
   JxlBasicInfo info;
   JxlPixelFormat format = {4, JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
 
-  JxlDecoderSetInput(dec.get(), jxl, size);
+  JxlDecoderSetInput(dec.get(), reinterpret_cast<uint8_t*>(compressed.data()),
+                     compressed.size());
   JxlDecoderCloseInput(dec.get());
 
   for (;;) {
@@ -158,9 +159,9 @@ bool DecodeOneShot(const uint8_t* jxl, size_t size, std::vector<float>* pixels,
         fprintf(stderr, "Invalid out buffer size\n");
         return false;
       }
-      pixels->resize(xsize * ysize * 4);
-      void* pixels_buffer = (void*)pixels->data();
-      size_t pixels_buffer_size = pixels->size() * sizeof(float);
+      pixels.resize(xsize * ysize * 4);
+      void* pixels_buffer = (void*)pixels.data();
+      size_t pixels_buffer_size = pixels.size() * sizeof(float);
       if (JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer(dec.get(), &format,
                                                          pixels_buffer,
                                                          pixels_buffer_size)) {

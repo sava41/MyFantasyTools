@@ -5,9 +5,63 @@
 #include <fstream>
 #include <string>
 
+#include "io.h"
+#include "jxl.h"
 #include "level_generated.h"
 
 namespace mft {
+
+class ViewData {
+ public:
+  ViewData(const std::string& name, int sizex, int sizey)
+      : m_name(name),
+        m_sizex(sizex),
+        m_sizey(sizey),
+        m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)) {
+    m_colorBuffer.reserve(m_sizex * m_sizey * sizeof(float));
+    m_depthBuffer.reserve(m_sizex * m_sizey * sizeof(float));
+  }
+  ~ViewData() = default;
+
+  ViewData(const ViewData&) = delete;
+  ViewData& operator=(const ViewData&) = delete;
+
+  ViewData(ViewData&&) = default;
+  ViewData& operator=(ViewData&&) = default;
+
+  void loadColorBuffer(const std::filesystem::path& filePath) {
+    size_t fileSizex, fileSizey;
+    std::vector<uint8_t> iccProfile;
+
+    std::vector<char> compressed = ReadBinary(filePath);
+    bool ret = jxl::DecodeOneShot(compressed, m_colorBuffer, fileSizex,
+                                  fileSizey, iccProfile);
+
+    if (fileSizex != m_sizex || fileSizey != m_sizey) m_colorBuffer.clear();
+  };
+  void loadDepthBuffer(const std::filesystem::path& filePath) {
+    size_t fileSizex, fileSizey;
+    std::vector<uint8_t> iccProfile;
+
+    std::vector<char> compressed = ReadBinary(filePath);
+    bool ret = jxl::DecodeOneShot(compressed, m_depthBuffer, fileSizex,
+                                  fileSizey, iccProfile);
+
+    if (fileSizex != m_sizex || fileSizey != m_sizey) m_depthBuffer.clear();
+  };
+
+ private:
+  std::string m_name;
+
+  int m_sizex;
+  int m_sizey;
+  float m_aspectRatio;
+
+  std::vector<int> m_adjacentViews;
+
+  std::vector<float> m_colorBuffer;
+  std::vector<float> m_depthBuffer;
+};
 
 bool LevelManager::loadLevel(const std::string& pathString) {
   const std::filesystem::path levelFilePath(pathString);
@@ -30,23 +84,29 @@ bool LevelManager::loadLevel(const std::string& pathString) {
 
   printf("Data path: %s\n", level->data_path()->c_str());
 
-  const auto views = level->views();
+  const auto viewsData = level->views();
 
-  for (int i = 0; i < views->size(); ++i) {
-    const auto view = views->Get(i);
-    const std::filesystem::path dataFilePath =
+  std::vector<ViewData> views;
+  views.reserve(viewsData->size());
+
+  for (int i = 0; i < viewsData->size(); ++i) {
+    const auto viewData = viewsData->Get(i);
+    const std::filesystem::path colorDataFilePath =
         levelFilePath.parent_path() /
-        std::filesystem::path(level->data_path()->str() + view->name()->str() +
-                              "_Color.jxl");
+        std::filesystem::path(level->data_path()->str() +
+                              viewData->name()->str() + "_Color.jxl");
 
-    std::ifstream dataFile;
-    dataFile.open(dataFilePath, std::ios::binary | std::ios::in);
+    const std::filesystem::path depthDataFilePath =
+        levelFilePath.parent_path() /
+        std::filesystem::path(level->data_path()->str() +
+                              viewData->name()->str() + "_Depth.jxl");
 
-    if (!dataFile.good()) {
-      fprintf(stderr, "Could not open %s\n", dataFilePath.string().c_str());
-    }
+    views.push_back(
+        {viewData->name()->str(), viewData->resX(), viewData->resY()});
+    views.back().loadColorBuffer(colorDataFilePath);
+    views.back().loadDepthBuffer(depthDataFilePath);
 
-    dataFile.close();
+    printf("loaded %s\n", viewData->name()->c_str());
   }
 
   levelFile.close();
