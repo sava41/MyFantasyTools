@@ -13,54 +13,89 @@ namespace mft {
 
 class ViewData {
  public:
-  ViewData(const std::string& name, int sizex, int sizey)
+  ViewData(const std::string& name, int sizex, int sizey,
+           const std::filesystem::path& dataDir)
       : m_name(name),
         m_sizex(sizex),
         m_sizey(sizey),
-        m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)) {
-    m_colorBuffer.reserve(m_sizex * m_sizey * sizeof(float));
-    m_depthBuffer.reserve(m_sizex * m_sizey * sizeof(float));
-  }
+        m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)),
+        m_colorBinPath(dataDir / std::filesystem::path(name + "_Color.jxl")),
+        m_depthBinPath(dataDir / std::filesystem::path(name + "_Depth.jxl")),
+        m_loaded(false){};
   ~ViewData() = default;
 
   ViewData(const ViewData&) = delete;
   ViewData& operator=(const ViewData&) = delete;
+  ViewData& operator=(ViewData&&) = delete;
 
-  ViewData(ViewData&&) = default;
-  ViewData& operator=(ViewData&&) = default;
+  ViewData(ViewData&& other) noexcept
+      : m_name(std::move(other.m_name)),
+        m_sizex(other.m_sizex),
+        m_sizey(other.m_sizey),
+        m_aspectRatio(other.m_aspectRatio),
+        m_adjacentViews(std::move(other.m_adjacentViews)),
+        m_colorBinPath(other.m_colorBinPath),
+        m_depthBinPath(other.m_depthBinPath),
+        m_loaded(other.m_loaded.load()),
+        m_colorBuffer(std::move(other.m_colorBuffer)),
+        m_depthBuffer(std::move(other.m_depthBuffer)) {
+    other.m_loaded.store(false);
+  };
 
-  void loadColorBuffer(const std::filesystem::path& filePath) {
+  bool loadData() {
     size_t fileSizex, fileSizey;
     std::vector<uint8_t> iccProfile;
 
-    std::vector<char> compressed = ReadBinary(filePath);
-    bool ret = jxl::DecodeOneShot(compressed, m_colorBuffer, fileSizex,
-                                  fileSizey, iccProfile);
+    {
+      m_colorBuffer.reserve(m_sizex * m_sizey * sizeof(float));
+      std::vector<char> compressed = ReadBinary(m_colorBinPath);
+      bool res = jxl::DecodeOneShot(compressed, m_colorBuffer, fileSizex,
+                                    fileSizey, iccProfile);
+      if (fileSizex != m_sizex || fileSizey != m_sizey || !res) {
+        unloadData();
+        return false;
+      }
+    }
 
-    if (fileSizex != m_sizex || fileSizey != m_sizey) m_colorBuffer.clear();
+    {
+      m_depthBuffer.reserve(m_sizex * m_sizey * sizeof(float));
+      std::vector<char> compressed = ReadBinary(m_depthBinPath);
+      bool res = jxl::DecodeOneShot(compressed, m_depthBuffer, fileSizex,
+                                    fileSizey, iccProfile);
+      if (fileSizex != m_sizex || fileSizey != m_sizey || !res) {
+        unloadData();
+        return false;
+      }
+    }
+
+    m_loaded = true;
+
+    return true;
   };
-  void loadDepthBuffer(const std::filesystem::path& filePath) {
-    size_t fileSizex, fileSizey;
-    std::vector<uint8_t> iccProfile;
 
-    std::vector<char> compressed = ReadBinary(filePath);
-    bool ret = jxl::DecodeOneShot(compressed, m_depthBuffer, fileSizex,
-                                  fileSizey, iccProfile);
+  void unloadData() {
+    m_depthBuffer.clear();
+    m_colorBuffer.clear();
 
-    if (fileSizex != m_sizex || fileSizey != m_sizey) m_depthBuffer.clear();
-  };
+    m_loaded = false;
+  }
 
  private:
-  std::string m_name;
+  const std::string m_name;
 
-  int m_sizex;
-  int m_sizey;
-  float m_aspectRatio;
+  const int m_sizex;
+  const int m_sizey;
+  const float m_aspectRatio;
 
   std::vector<int> m_adjacentViews;
 
+  const std::filesystem::path m_colorBinPath;
+  const std::filesystem::path m_depthBinPath;
+
   std::vector<float> m_colorBuffer;
   std::vector<float> m_depthBuffer;
+
+  std::atomic<bool> m_loaded;
 };
 
 bool LevelManager::loadLevel(const std::string& pathString) {
@@ -82,6 +117,10 @@ bool LevelManager::loadLevel(const std::string& pathString) {
 
   const auto level = MFT::GetLevel(data.get());
 
+  const std::filesystem::path dataFilePath =
+      levelFilePath.parent_path() /
+      std::filesystem::path(level->data_path()->str());
+
   printf("Data path: %s\n", level->data_path()->c_str());
 
   const auto viewsData = level->views();
@@ -91,20 +130,10 @@ bool LevelManager::loadLevel(const std::string& pathString) {
 
   for (int i = 0; i < viewsData->size(); ++i) {
     const auto viewData = viewsData->Get(i);
-    const std::filesystem::path colorDataFilePath =
-        levelFilePath.parent_path() /
-        std::filesystem::path(level->data_path()->str() +
-                              viewData->name()->str() + "_Color.jxl");
 
-    const std::filesystem::path depthDataFilePath =
-        levelFilePath.parent_path() /
-        std::filesystem::path(level->data_path()->str() +
-                              viewData->name()->str() + "_Depth.jxl");
-
-    views.push_back(
-        {viewData->name()->str(), viewData->resX(), viewData->resY()});
-    views.back().loadColorBuffer(colorDataFilePath);
-    views.back().loadDepthBuffer(depthDataFilePath);
+    views.emplace_back(viewData->name()->str(), viewData->resX(),
+                       viewData->resY(), dataFilePath);
+    views.back().loadData();
 
     printf("loaded %s\n", viewData->name()->c_str());
   }
