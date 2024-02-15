@@ -14,13 +14,15 @@ namespace mft {
 class ViewData {
  public:
   ViewData(const std::string& name, int sizex, int sizey,
-           const std::filesystem::path& dataDir)
+           const std::filesystem::path& dataDir,
+           const std::vector<int>& adjacentViews)
       : m_name(name),
         m_sizex(sizex),
         m_sizey(sizey),
         m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)),
         m_colorBinPath(dataDir / std::filesystem::path(name + "_Color.jxl")),
         m_depthBinPath(dataDir / std::filesystem::path(name + "_Depth.jxl")),
+        m_adjacentViews(adjacentViews),
         m_loaded(false){};
   ~ViewData() = default;
 
@@ -34,12 +36,15 @@ class ViewData {
         m_sizey(other.m_sizey),
         m_aspectRatio(other.m_aspectRatio),
         m_adjacentViews(std::move(other.m_adjacentViews)),
-        m_colorBinPath(other.m_colorBinPath),
-        m_depthBinPath(other.m_depthBinPath),
+        m_colorBinPath(std::move(other.m_colorBinPath)),
+        m_depthBinPath(std::move(other.m_depthBinPath)),
         m_loaded(other.m_loaded.load()),
         m_colorBuffer(std::move(other.m_colorBuffer)),
         m_depthBuffer(std::move(other.m_depthBuffer)) {
     other.m_loaded.store(false);
+    m_sizex = 0;
+    m_sizey = 0;
+    m_aspectRatio = 0.0;
   };
 
   bool loadData() {
@@ -81,16 +86,16 @@ class ViewData {
   }
 
  private:
-  const std::string m_name;
+  std::string m_name;
 
-  const int m_sizex;
-  const int m_sizey;
-  const float m_aspectRatio;
+  int m_sizex;
+  int m_sizey;
+  float m_aspectRatio;
 
   std::vector<int> m_adjacentViews;
 
-  const std::filesystem::path m_colorBinPath;
-  const std::filesystem::path m_depthBinPath;
+  std::filesystem::path m_colorBinPath;
+  std::filesystem::path m_depthBinPath;
 
   std::vector<float> m_colorBuffer;
   std::vector<float> m_depthBuffer;
@@ -129,10 +134,12 @@ bool LevelManager::loadLevel(const std::string& pathString) {
   views.reserve(viewsData->size());
 
   for (int i = 0; i < viewsData->size(); ++i) {
-    const auto viewData = viewsData->Get(i);
+    const auto* const viewData = viewsData->Get(i);
 
     views.emplace_back(viewData->name()->str(), viewData->resX(),
-                       viewData->resY(), dataFilePath);
+                       viewData->resY(), dataFilePath,
+                       std::vector<int>(viewData->adjacent_views()->begin(),
+                                        viewData->adjacent_views()->end()));
     views.back().loadData();
 
     printf("loaded %s\n", viewData->name()->c_str());
