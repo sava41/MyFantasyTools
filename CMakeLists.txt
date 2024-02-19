@@ -1,14 +1,15 @@
-cmake_minimum_required(VERSION 3.19)
-set(CMAKE_CXX_STANDARD 20)
-include(FetchContent)
-
+cmake_minimum_required(VERSION 3.22)
 project(MyFantasyTools)
+
+set(CMAKE_CXX_STANDARD 17)
 
 #-------Find Python-------
 find_package(Python 3.10 EXACT COMPONENTS Interpreter Development REQUIRED)
 
 #-------Set Up Third Party Dependencies-------
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/third_party)
+
+include(FetchContent)
 
 message("Configuring libjxl")
 FetchContent_Declare(
