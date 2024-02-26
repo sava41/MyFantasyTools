@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-#include "level_generated.h"
 #include "level_manager.h"
 
 int main(int argc, char *argv[]) {
