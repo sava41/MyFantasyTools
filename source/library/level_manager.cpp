@@ -99,10 +99,10 @@ class ViewData {
 bool LevelManager::load_level(const std::string& pathString) {
   const std::filesystem::path levelFilePath(pathString);
 
-  m_data_buffer = read_binary(levelFilePath);
+  m_dataBuffer = read_binary(levelFilePath);
 
   const auto* level =
-      flattbuffer::GetLevel(reinterpret_cast<void*>(m_data_buffer.data()));
+      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
 
   const std::filesystem::path dataFilePath =
       levelFilePath.parent_path() /
@@ -126,6 +126,41 @@ bool LevelManager::load_level(const std::string& pathString) {
   }
 
   return true;
+}
+
+int LevelManager::get_views_length() {
+  const auto* level =
+      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+
+  return level->views()->size();
+}
+
+std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(int viewIndex) {
+  const auto* level =
+      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+
+  if (0 > viewIndex || viewIndex >= level->views()->size()) return {};
+
+  const auto* worldTransform =
+      level->views()->Get(viewIndex)->world_transform();
+
+  return {worldTransform->m00(), worldTransform->m01(), worldTransform->m02(),
+          worldTransform->m03(), worldTransform->m10(), worldTransform->m11(),
+          worldTransform->m12(), worldTransform->m13(), worldTransform->m20(),
+          worldTransform->m21(), worldTransform->m22(), worldTransform->m23(),
+          worldTransform->m30(), worldTransform->m31(), worldTransform->m32(),
+          worldTransform->m33()};
+}
+
+std::vector<int> LevelManager::get_adjacent_views(int viewIndex) {
+  const auto* level =
+      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+
+  if (0 > viewIndex || viewIndex >= level->views()->size()) return {};
+
+  const auto* adjacentViews = level->views()->Get(viewIndex)->adjacent_views();
+
+  return std::vector<int>(adjacentViews->begin(), adjacentViews->end());
 }
 
 }  // namespace mft
