@@ -5,9 +5,9 @@
 
 namespace mft {
 
-bool WriteBinary(const std::filesystem::path& binPath,
-                 const std::vector<char>& buffer);
+bool write_binary(const std::filesystem::path& binPath,
+                  const std::vector<char>& buffer);
 
-std::vector<char> ReadBinary(const std::filesystem::path& binPath);
+std::vector<char> read_binary(const std::filesystem::path& binPath);
 
 }  // namespace mft

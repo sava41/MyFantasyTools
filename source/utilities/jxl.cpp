@@ -9,9 +9,9 @@
 
 namespace mft::jxl {
 
-bool EncodeOneshot(const uint32_t xsize, const uint32_t ysize,
-                   const uint32_t channels, const void* pixelData,
-                   std::vector<char>& compressed) {
+bool encode_oneshot(const uint32_t xsize, const uint32_t ysize,
+                    const uint32_t channels, const void* pixelData,
+                    std::vector<char>& compressed) {
   auto enc = JxlEncoderMake(nullptr);
   auto runner = JxlThreadParallelRunnerMake(
       nullptr, JxlThreadParallelRunnerDefaultNumWorkerThreads());
@@ -84,9 +84,9 @@ bool EncodeOneshot(const uint32_t xsize, const uint32_t ysize,
   return true;
 }
 
-bool DecodeOneShot(std::vector<char>& compressed, std::vector<float>& pixels,
-                   size_t& xsize, size_t& ysize,
-                   std::vector<uint8_t>& iccProfile) {
+bool decode_oneshot(std::vector<char>& compressed, std::vector<float>& pixels,
+                    size_t& xsize, size_t& ysize,
+                    std::vector<uint8_t>& iccProfile) {
   // Multi-threaded parallel runner.
   auto runner = JxlResizableParallelRunnerMake(nullptr);
 

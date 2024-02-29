@@ -9,7 +9,7 @@ int main(int argc, char *argv[]) {
   }
 
   mft::LevelManager manager;
-  if (!manager.loadLevel(argv[1])) {
+  if (!manager.load_level(argv[1])) {
     return 1;
   }
 

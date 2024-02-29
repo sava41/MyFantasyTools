@@ -5,8 +5,8 @@
 
 namespace mft {
 
-bool WriteBinary(const std::filesystem::path& binPath,
-                 const std::vector<char>& buffer) {
+bool write_binary(const std::filesystem::path& binPath,
+                  const std::vector<char>& buffer) {
   std::ofstream binary(binPath, std::ios::binary);
 
   bool res = true;
@@ -22,7 +22,7 @@ bool WriteBinary(const std::filesystem::path& binPath,
   return res;
 }
 
-std::vector<char> ReadBinary(const std::filesystem::path& binPath) {
+std::vector<char> read_binary(const std::filesystem::path& binPath) {
   std::vector<char> buffer;
 
   std::ifstream binary;

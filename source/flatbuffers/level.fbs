@@ -1,4 +1,4 @@
-namespace MFT;
+namespace flattbuffer;
 
 struct Vec3 {
   x: float;
@@ -37,8 +37,8 @@ table View {
   name: string;
   world_transform: Mat4;
   aspect: float;
-  resX: uint16;
-  resY: uint16;
+  res_x: uint16;
+  res_y: uint16;
   adjacent_views: [uint16];
 }
 
