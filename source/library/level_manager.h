@@ -20,9 +20,11 @@ class LevelManager {
   int get_views_length();
   std::array<float, MAT4_SIZE> get_view_tranform(int viewIndex);
   std::vector<int> get_adjacent_views(int viewIndex);
+  int get_view_id_from_position(float x, float y, float z);
 
  private:
   std::vector<char> m_dataBuffer;
   //  std::vector<ViewData> m_views;
 };
+
 }  // namespace mft

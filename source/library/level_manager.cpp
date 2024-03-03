@@ -2,10 +2,12 @@
 
 #include <filesystem>
 #include <fstream>
+#include <limits>
 
 #include "io.h"
 #include "jxl.h"
 #include "level_generated.h"
+#include "math.h"
 
 namespace mft {
 
@@ -102,7 +104,7 @@ bool LevelManager::load_level(const std::string& pathString) {
   m_dataBuffer = read_binary(levelFilePath);
 
   const auto* level =
-      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
 
   const std::filesystem::path dataFilePath =
       levelFilePath.parent_path() /
@@ -130,14 +132,14 @@ bool LevelManager::load_level(const std::string& pathString) {
 
 int LevelManager::get_views_length() {
   const auto* level =
-      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
 
   return level->views()->size();
 }
 
 std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(int viewIndex) {
   const auto* level =
-      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
 
   if (0 > viewIndex || viewIndex >= level->views()->size()) return {};
 
@@ -154,13 +156,40 @@ std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(int viewIndex) {
 
 std::vector<int> LevelManager::get_adjacent_views(int viewIndex) {
   const auto* level =
-      flattbuffer::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
 
   if (0 > viewIndex || viewIndex >= level->views()->size()) return {};
 
   const auto* adjacentViews = level->views()->Get(viewIndex)->adjacent_views();
 
   return std::vector<int>(adjacentViews->begin(), adjacentViews->end());
+}
+
+int LevelManager::get_view_id_from_position(float x, float y, float z) {
+  const auto* level =
+      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+
+  const auto* verts = level->navmesh_verts();
+
+  data::Vec3 point(x, y, z);
+
+  float minDistance = std::numeric_limits<float>::max();
+  int id = 0;
+
+  for (auto triangle = level->navmesh_tris()->begin();
+       triangle != level->navmesh_tris()->end(); ++triangle) {
+    data::Vec3 closestPoint = closesPointOnTriangle(
+        *verts->Get(triangle->vert1()), *verts->Get(triangle->vert2()),
+        *verts->Get(triangle->vert3()), point);
+    float distance = length(sub(point, closestPoint));
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      id = triangle->view_id();
+    }
+  }
+
+  return id;
 }
 
 }  // namespace mft
