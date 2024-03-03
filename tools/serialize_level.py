@@ -18,12 +18,12 @@ sys.path.append(working_dir_path)
 import mftools
 import mfblender
 
-sys.path.append("./build/generated_flatbuffers/")
-import MFT.Vec3
-import MFT.Mat4
-import MFT.View
-import MFT.Level
-import MFT.Triangle
+sys.path.append("./build/generated/")
+import mft.data.Vec3
+import mft.data.Mat4
+import mft.data.View
+import mft.data.Level
+import mft.data.Triangle
 
 
 def process_navmesh(scene, cameras, output_path):
@@ -42,19 +42,19 @@ def process_navmesh(scene, cameras, output_path):
         for camera in cameras:
             camera_name = builder.CreateString(camera.object.name)
 
-            MFT.View.StartAdjacentViewsVector(builder, len(camera.adjacent_views))
+            mft.data.View.StartAdjacentViewsVector(builder, len(camera.adjacent_views))
             for adj_view in camera.adjacent_views:
                 builder.PrependUint16(adj_view)
             adjacent_views = builder.EndVector()
-            MFT.View.Start(builder)
-            MFT.View.AddName(builder, camera_name)
-            MFT.View.AddAspect(builder, float(camera.res_x) / float(camera.res_y))
-            MFT.View.AddResX(builder, camera.res_x)
-            MFT.View.AddResY(builder, camera.res_y)
+            mft.data.View.Start(builder)
+            mft.data.View.AddName(builder, camera_name)
+            mft.data.View.AddAspect(builder, float(camera.res_x) / float(camera.res_y))
+            mft.data.View.AddResX(builder, camera.res_x)
+            mft.data.View.AddResY(builder, camera.res_y)
             matrix_world = camera.object.matrix_world
-            MFT.View.AddWorldTransform(
+            mft.data.View.AddWorldTransform(
                 builder,
-                MFT.Mat4.CreateMat4(
+                mft.data.Mat4.CreateMat4(
                     builder,
                     matrix_world[0][0],
                     matrix_world[0][1],
@@ -74,26 +74,30 @@ def process_navmesh(scene, cameras, output_path):
                     matrix_world[3][3],
                 ),
             )
-            MFT.View.AddAdjacentViews(builder, adjacent_views)
-            view = MFT.View.End(builder)
+            mft.data.View.AddAdjacentViews(builder, adjacent_views)
+            view = mft.data.View.End(builder)
             views.append(view)
 
-        MFT.Level.StartViewsVector(builder, len(cameras))
+        mft.data.Level.StartViewsVector(builder, len(cameras))
         for view in views:
             builder.PrependUOffsetTRelative(view)
         views = builder.EndVector()
 
-        MFT.Level.StartNavmeshVertsVector(builder, len(navmesh.object.data.vertices))
+        mft.data.Level.StartNavmeshVertsVector(
+            builder, len(navmesh.object.data.vertices)
+        )
         for vert in reversed(navmesh.object.data.vertices):
-            MFT.Vec3.CreateVec3(builder, vert.co.x, vert.co.y, vert.co.z)
+            mft.data.Vec3.CreateVec3(builder, vert.co.x, vert.co.y, vert.co.z)
         navmesh_verts = builder.EndVector()
 
-        MFT.Level.StartNavmeshTrisVector(builder, len(navmesh.object.data.vertices))
+        mft.data.Level.StartNavmeshTrisVector(
+            builder, len(navmesh.object.data.vertices)
+        )
         for tri in reversed(navmesh.object.data.loop_triangles):
             view_index = (
                 navmesh.object.data.attributes["Views"].data[tri.polygon_index].value
             )
-            MFT.Triangle.CreateTriangle(
+            mft.data.Triangle.CreateTriangle(
                 builder,
                 tri.vertices[0],
                 tri.vertices[1],
@@ -106,13 +110,13 @@ def process_navmesh(scene, cameras, output_path):
         level_name = builder.CreateString(navmesh.name)
         level_data_path = builder.CreateString("./views/")
 
-        MFT.Level.Start(builder)
-        MFT.Level.AddNavmeshVerts(builder, navmesh_verts)
-        MFT.Level.AddNavmeshTris(builder, navmesh_tris)
-        MFT.Level.AddViews(builder, views)
-        MFT.Level.AddDataPath(builder, level_data_path)
-        MFT.Level.AddName(builder, level_name)
-        level = MFT.Level.End(builder)
+        mft.data.Level.Start(builder)
+        mft.data.Level.AddNavmeshVerts(builder, navmesh_verts)
+        mft.data.Level.AddNavmeshTris(builder, navmesh_tris)
+        mft.data.Level.AddViews(builder, views)
+        mft.data.Level.AddDataPath(builder, level_data_path)
+        mft.data.Level.AddName(builder, level_name)
+        level = mft.data.Level.End(builder)
 
         builder.Finish(level)
 
