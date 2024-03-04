@@ -137,6 +137,15 @@ int LevelManager::get_views_length() {
   return level->views()->size();
 }
 
+std::string LevelManager::get_view_name(int viewIndex) {
+  const auto* level =
+      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+
+  if (0 > viewIndex || viewIndex >= level->views()->size()) return "";
+
+  return level->views()->Get(viewIndex)->name()->str();
+}
+
 std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(int viewIndex) {
   const auto* level =
       data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
