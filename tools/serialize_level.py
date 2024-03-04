@@ -79,7 +79,7 @@ def process_navmesh(scene, cameras, output_path):
             views.append(view)
 
         mft.data.Level.StartViewsVector(builder, len(cameras))
-        for view in views:
+        for view in reversed(views):
             builder.PrependUOffsetTRelative(view)
         views = builder.EndVector()
 
