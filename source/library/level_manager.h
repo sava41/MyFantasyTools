@@ -11,21 +11,31 @@ constexpr int MAT4_SIZE = 16;
 
 namespace mft {
 
+class ViewData;
+
 class LevelManager {
  public:
-  LevelManager() = default;
-  ~LevelManager() = default;
+  LevelManager();
+  ~LevelManager();
 
   bool load_level(const std::string& path);
-  int get_views_length();
-  std::string get_view_name(int viewIndex);
-  std::array<float, MAT4_SIZE> get_view_tranform(int viewIndex);
-  std::vector<int> get_adjacent_views(int viewIndex);
-  int get_view_id_from_position(float x, float y, float z);
+  int get_views_length() const;
+
+  std::string get_view_name(int viewIndex) const;
+  int get_view_width(int viewIndex) const;
+  int get_view_height(int viewIndex) const;
+  std::array<float, MAT4_SIZE> get_view_tranform(int viewIndex) const;
+
+  const float* get_view_color_buffer(int viewIndex) const;
+  const float* get_view_depth_buffer(int viewIndex) const;
+
+  std::vector<int> get_adjacent_views(int viewIndex) const;
+
+  int get_view_id_from_position(float x, float y, float z) const;
 
  private:
   std::vector<char> m_dataBuffer;
-  //  std::vector<ViewData> m_views;
+  std::vector<ViewData> m_views;
 };
 
 }  // namespace mft

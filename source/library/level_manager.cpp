@@ -44,6 +44,8 @@ class ViewData {
     m_aspectRatio = 0.0;
   };
 
+  bool loaded() const { return m_loaded; }
+
   bool load_data() {
     size_t fileSizex, fileSizey;
     std::vector<uint8_t> iccProfile;
@@ -82,6 +84,24 @@ class ViewData {
     m_loaded = false;
   }
 
+  std::string get_name() const { return m_name; }
+
+  int get_res_x() const { return m_sizex; }
+
+  int get_res_y() const { return m_sizey; }
+
+  const float* get_color_buffer() const {
+    if (!m_loaded) return nullptr;
+
+    return m_colorBuffer.data();
+  }
+
+  const float* get_depth_buffer() const {
+    if (!m_loaded) return nullptr;
+
+    return m_depthBuffer.data();
+  }
+
  private:
   std::string m_name;
 
@@ -98,8 +118,14 @@ class ViewData {
   std::atomic<bool> m_loaded;
 };
 
+LevelManager::LevelManager() = default;
+LevelManager::~LevelManager() = default;
+
 bool LevelManager::load_level(const std::string& pathString) {
   const std::filesystem::path levelFilePath(pathString);
+
+  m_views.clear();
+  m_dataBuffer.clear();
 
   m_dataBuffer = read_binary(levelFilePath);
 
@@ -114,15 +140,14 @@ bool LevelManager::load_level(const std::string& pathString) {
 
   const auto* viewsData = level->views();
 
-  std::vector<ViewData> views;
-  views.reserve(viewsData->size());
+  m_views.reserve(viewsData->size());
 
   for (int i = 0; i < viewsData->size(); ++i) {
     const auto* const viewData = viewsData->Get(i);
 
-    views.emplace_back(viewData->name()->str(), viewData->res_x(),
-                       viewData->res_y(), dataFilePath);
-    views.back().load_data();
+    m_views.emplace_back(viewData->name()->str(), viewData->res_x(),
+                         viewData->res_y(), dataFilePath);
+    m_views.back().load_data();
 
     printf("loaded %s\n", viewData->name()->c_str());
   }
@@ -130,27 +155,32 @@ bool LevelManager::load_level(const std::string& pathString) {
   return true;
 }
 
-int LevelManager::get_views_length() {
-  const auto* level =
-      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+int LevelManager::get_views_length() const { return m_views.size(); }
 
-  return level->views()->size();
+std::string LevelManager::get_view_name(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return "";
+
+  return m_views.at(viewIndex).get_name();
 }
 
-std::string LevelManager::get_view_name(int viewIndex) {
-  const auto* level =
-      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+int LevelManager::get_view_width(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return 0;
 
-  if (0 > viewIndex || viewIndex >= level->views()->size()) return "";
-
-  return level->views()->Get(viewIndex)->name()->str();
+  return m_views.at(viewIndex).get_res_x();
 }
 
-std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(int viewIndex) {
-  const auto* level =
-      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+int LevelManager::get_view_height(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return 0;
 
-  if (0 > viewIndex || viewIndex >= level->views()->size()) return {};
+  return m_views.at(viewIndex).get_res_y();
+}
+
+std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(
+    int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return {};
+
+  const auto* level =
+      data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
 
   const auto* worldTransform =
       level->views()->Get(viewIndex)->world_transform();
@@ -163,20 +193,36 @@ std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(int viewIndex) {
           worldTransform->m33()};
 }
 
-std::vector<int> LevelManager::get_adjacent_views(int viewIndex) {
-  const auto* level =
-      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+const float* LevelManager::get_view_color_buffer(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
 
-  if (0 > viewIndex || viewIndex >= level->views()->size()) return {};
+  if (!m_views.at(viewIndex).loaded()) return nullptr;
+
+  m_views.at(viewIndex).get_color_buffer();
+}
+
+const float* LevelManager::get_view_depth_buffer(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
+
+  if (!m_views.at(viewIndex).loaded()) return nullptr;
+
+  m_views.at(viewIndex).get_depth_buffer();
+}
+
+std::vector<int> LevelManager::get_adjacent_views(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return {};
+
+  const auto* level =
+      data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
 
   const auto* adjacentViews = level->views()->Get(viewIndex)->adjacent_views();
 
   return std::vector<int>(adjacentViews->begin(), adjacentViews->end());
 }
 
-int LevelManager::get_view_id_from_position(float x, float y, float z) {
+int LevelManager::get_view_id_from_position(float x, float y, float z) const {
   const auto* level =
-      data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
+      data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
 
   const auto* verts = level->navmesh_verts();
 
