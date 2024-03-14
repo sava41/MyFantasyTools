@@ -25,9 +25,10 @@ class LevelManager {
   int get_view_width(int viewIndex) const;
   int get_view_height(int viewIndex) const;
   std::array<float, MAT4_SIZE> get_view_tranform(int viewIndex) const;
+  float get_view_fov(int viewIndex) const;
 
-  const float* get_view_color_buffer(int viewIndex) const;
-  const float* get_view_depth_buffer(int viewIndex) const;
+  float* get_view_color_buffer(int viewIndex) const;
+  float* get_view_depth_buffer(int viewIndex) const;
 
   std::vector<int> get_adjacent_views(int viewIndex) const;
 

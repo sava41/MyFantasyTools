@@ -40,6 +40,7 @@ def process_navmesh(scene, cameras, output_path):
 
         views = list()
         for camera in cameras:
+
             camera_name = builder.CreateString(camera.object.name)
 
             mft.data.View.StartAdjacentViewsVector(builder, len(camera.adjacent_views))
@@ -49,6 +50,7 @@ def process_navmesh(scene, cameras, output_path):
             mft.data.View.Start(builder)
             mft.data.View.AddName(builder, camera_name)
             mft.data.View.AddAspect(builder, float(camera.res_x) / float(camera.res_y))
+            mft.data.View.AddFov(builder, camera.fov)
             mft.data.View.AddResX(builder, camera.res_x)
             mft.data.View.AddResY(builder, camera.res_y)
             matrix_world = camera.object.matrix_world

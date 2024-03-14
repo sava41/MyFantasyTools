@@ -13,11 +13,12 @@ namespace mft {
 
 class ViewData {
  public:
-  ViewData(const std::string& name, int sizex, int sizey,
+  ViewData(const std::string& name, int sizex, int sizey, float fov,
            const std::filesystem::path& dataDir)
       : m_name(name),
         m_sizex(sizex),
         m_sizey(sizey),
+        m_fov(fov),
         m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)),
         m_colorBinPath(dataDir / std::filesystem::path(name + "_Color.jxl")),
         m_depthBinPath(dataDir / std::filesystem::path(name + "_Depth.jxl")),
@@ -33,6 +34,7 @@ class ViewData {
         m_sizex(other.m_sizex),
         m_sizey(other.m_sizey),
         m_aspectRatio(other.m_aspectRatio),
+        m_fov(other.m_fov),
         m_colorBinPath(std::move(other.m_colorBinPath)),
         m_depthBinPath(std::move(other.m_depthBinPath)),
         m_loaded(other.m_loaded.load()),
@@ -90,6 +92,8 @@ class ViewData {
 
   int get_res_y() const { return m_sizey; }
 
+  float get_fov() const { return m_fov; }
+
   const float* get_color_buffer() const {
     if (!m_loaded) return nullptr;
 
@@ -108,6 +112,7 @@ class ViewData {
   int m_sizex;
   int m_sizey;
   float m_aspectRatio;
+  float m_fov;
 
   std::filesystem::path m_colorBinPath;
   std::filesystem::path m_depthBinPath;
@@ -146,7 +151,7 @@ bool LevelManager::load_level(const std::string& pathString) {
     const auto* const viewData = viewsData->Get(i);
 
     m_views.emplace_back(viewData->name()->str(), viewData->res_x(),
-                         viewData->res_y(), dataFilePath);
+                         viewData->res_y(), viewData->fov(), dataFilePath);
     m_views.back().load_data();
 
     printf("loaded %s\n", viewData->name()->c_str());
@@ -193,20 +198,26 @@ std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(
           worldTransform->m33()};
 }
 
-const float* LevelManager::get_view_color_buffer(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
+float LevelManager::get_view_fov(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return 0;
 
-  if (!m_views.at(viewIndex).loaded()) return nullptr;
-
-  m_views.at(viewIndex).get_color_buffer();
+  return m_views.at(viewIndex).get_fov();
 }
 
-const float* LevelManager::get_view_depth_buffer(int viewIndex) const {
+float* LevelManager::get_view_color_buffer(int viewIndex) const {
   if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
 
   if (!m_views.at(viewIndex).loaded()) return nullptr;
 
-  m_views.at(viewIndex).get_depth_buffer();
+  return const_cast<float*>(m_views.at(viewIndex).get_color_buffer());
+}
+
+float* LevelManager::get_view_depth_buffer(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
+
+  if (!m_views.at(viewIndex).loaded()) return nullptr;
+
+  return const_cast<float*>(m_views.at(viewIndex).get_depth_buffer());
 }
 
 std::vector<int> LevelManager::get_adjacent_views(int viewIndex) const {

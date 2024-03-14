@@ -37,6 +37,7 @@ table View {
   name: string;
   world_transform: Mat4;
   aspect: float;
+  fov: float;
   res_x: uint16;
   res_y: uint16;
   adjacent_views: [uint16];

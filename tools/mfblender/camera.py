@@ -10,6 +10,9 @@ class Camera:
         self.render_output_path = output_path + "//renders//" + object.name
         self.adjacent_views = {}
 
+        object.data.lens_unit = "FOV"
+        self.fov = object.data.lens
+
     def set_active(self, scene):
         scene.camera = self.object
         scene.render.resolution_x = self.res_x
