@@ -1,4 +1,5 @@
 import bpy
+from math import degrees
 
 
 class Camera:
@@ -10,8 +11,7 @@ class Camera:
         self.render_output_path = output_path + "//renders//" + object.name
         self.adjacent_views = {}
 
-        object.data.lens_unit = "FOV"
-        self.fov = object.data.lens
+        self.fov = degrees(object.data.angle)
 
     def set_active(self, scene):
         scene.camera = self.object
