@@ -258,4 +258,28 @@ int LevelManager::get_view_id_from_position(float x, float y, float z) const {
   return id;
 }
 
+int LevelManager::get_navmesh_tri_size() {
+  const auto* level =
+      data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
+
+  return level->navmesh_tris()->size();
+}
+
+std::array<float, 9> LevelManager::get_navmesh_tri_verts(int triIndex) {
+  const auto* level =
+      data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
+
+  if (triIndex < 0 || triIndex >= level->navmesh_tris()->size()) return {{}};
+
+  auto triangle = level->navmesh_tris()->Get(triIndex);
+  auto verts = level->navmesh_verts();
+
+  return {
+      verts->Get(triangle->vert1())->x(), verts->Get(triangle->vert1())->y(),
+      verts->Get(triangle->vert1())->z(), verts->Get(triangle->vert2())->x(),
+      verts->Get(triangle->vert2())->y(), verts->Get(triangle->vert2())->z(),
+      verts->Get(triangle->vert3())->x(), verts->Get(triangle->vert3())->y(),
+      verts->Get(triangle->vert3())->z()};
+}
+
 }  // namespace mft
