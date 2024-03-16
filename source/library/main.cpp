@@ -13,6 +13,10 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  printf("there are %d cameras in this scene\n", manager.get_views_length());
+  printf("there are %d triangles in the navmesh\n",
+         manager.get_navmesh_tris_length());
+
   printf("fini");
   return 0;
 }

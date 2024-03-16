@@ -93,8 +93,9 @@ def process_navmesh(scene, cameras, output_path):
         navmesh_verts = builder.EndVector()
 
         mft.data.Level.StartNavmeshTrisVector(
-            builder, len(navmesh.object.data.vertices)
+            builder, len(navmesh.object.data.loop_triangles)
         )
+
         for tri in reversed(navmesh.object.data.loop_triangles):
             view_index = (
                 navmesh.object.data.attributes["Views"].data[tri.polygon_index].value

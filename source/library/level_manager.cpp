@@ -258,7 +258,7 @@ int LevelManager::get_view_id_from_position(float x, float y, float z) const {
   return id;
 }
 
-int LevelManager::get_navmesh_tri_size() {
+int LevelManager::get_navmesh_tris_length() {
   const auto* level =
       data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
 

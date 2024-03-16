@@ -34,7 +34,7 @@ class LevelManager {
 
   int get_view_id_from_position(float x, float y, float z) const;
 
-  int get_navmesh_tri_size();
+  int get_navmesh_tris_length();
   std::array<float, 9> get_navmesh_tri_verts(int triIndex);
 
  private:
