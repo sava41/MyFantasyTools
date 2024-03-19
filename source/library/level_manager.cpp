@@ -22,6 +22,8 @@ class ViewData {
         m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)),
         m_colorBinPath(dataDir / std::filesystem::path(name + "_Color.jxl")),
         m_depthBinPath(dataDir / std::filesystem::path(name + "_Depth.jxl")),
+        m_envBinPath(dataDir /
+                     std::filesystem::path(name + "_Environment.jxl")),
         m_loaded(false){};
   ~ViewData() = default;
 
@@ -37,9 +39,11 @@ class ViewData {
         m_fov(other.m_fov),
         m_colorBinPath(std::move(other.m_colorBinPath)),
         m_depthBinPath(std::move(other.m_depthBinPath)),
+        m_envBinPath(std::move(other.m_envBinPath)),
         m_loaded(other.m_loaded.load()),
         m_colorBuffer(std::move(other.m_colorBuffer)),
-        m_depthBuffer(std::move(other.m_depthBuffer)) {
+        m_depthBuffer(std::move(other.m_depthBuffer)),
+        m_envBuffer(std::move(other.m_envBuffer)) {
     other.m_loaded.store(false);
     m_sizex = 0;
     m_sizey = 0;
@@ -69,6 +73,17 @@ class ViewData {
       bool res = jxl::decode_oneshot(compressed, m_depthBuffer, fileSizex,
                                      fileSizey, iccProfile);
       if (fileSizex != m_sizex || fileSizey != m_sizey || !res) {
+        unload_data();
+        return false;
+      }
+    }
+
+    {
+      m_envBuffer.reserve(1024 * 512 * sizeof(float));
+      std::vector<char> compressed = read_binary(m_envBinPath);
+      bool res = jxl::decode_oneshot(compressed, m_envBuffer, fileSizex,
+                                     fileSizey, iccProfile);
+      if (fileSizex != 1024 || fileSizey != 512 || !res) {
         unload_data();
         return false;
       }
@@ -106,6 +121,12 @@ class ViewData {
     return m_depthBuffer.data();
   }
 
+  const float* get_env_buffer() const {
+    if (!m_loaded) return nullptr;
+
+    return m_envBuffer.data();
+  }
+
  private:
   std::string m_name;
 
@@ -116,9 +137,11 @@ class ViewData {
 
   std::filesystem::path m_colorBinPath;
   std::filesystem::path m_depthBinPath;
+  std::filesystem::path m_envBinPath;
 
   std::vector<float> m_colorBuffer;
   std::vector<float> m_depthBuffer;
+  std::vector<float> m_envBuffer;
 
   std::atomic<bool> m_loaded;
 };
@@ -218,6 +241,14 @@ float* LevelManager::get_view_depth_buffer(int viewIndex) const {
   if (!m_views.at(viewIndex).loaded()) return nullptr;
 
   return const_cast<float*>(m_views.at(viewIndex).get_depth_buffer());
+}
+
+float* LevelManager::get_view_env_buffer(int viewIndex) const {
+  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
+
+  if (!m_views.at(viewIndex).loaded()) return nullptr;
+
+  return const_cast<float*>(m_views.at(viewIndex).get_env_buffer());
 }
 
 std::vector<int> LevelManager::get_adjacent_views(int viewIndex) const {

@@ -29,6 +29,7 @@ class LevelManager {
 
   float* get_view_color_buffer(int viewIndex) const;
   float* get_view_depth_buffer(int viewIndex) const;
+  float* get_view_env_buffer(int viewIndex) const;
 
   std::vector<int> get_adjacent_views(int viewIndex) const;
 

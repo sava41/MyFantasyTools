@@ -113,7 +113,11 @@ if __name__ == "__main__":
     # Render
     for camera in cameras:
         camera.set_active(scene)
-        mfblender.set_composite_nodes(camera.render_output_path)
+        mfblender.set_main_composite_nodes(camera.render_output_path)
+        bpy.ops.render.render(scene=scene.name)
+
+        camera.set_env_probe_active(scene)
+        mfblender.set_env_composite_nodes(camera.render_output_path)
         bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
@@ -143,6 +147,8 @@ if __name__ == "__main__":
                 if "Depth" in filename:
                     image_flags = image_flags | cv2.IMREAD_GRAYSCALE
                     channels = 1
+                if "Environment" in filename:
+                    image_flags = image_flags | cv2.IMREAD_ANYCOLOR
 
                 img = cv2.imread(str(filepath.resolve()), image_flags)
 

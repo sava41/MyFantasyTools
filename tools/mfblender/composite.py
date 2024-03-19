@@ -1,51 +1,81 @@
 import bpy
 
 
-def set_composite_nodes(output_path, enabled=True):
+def setup():
     # switch on nodes and get reference
-    bpy.context.scene.use_nodes = enabled
+    bpy.context.scene.use_nodes = True
 
-    if enabled:
-        bpy.context.scene.view_layers["ViewLayer"].use_pass_combined = True
-        bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
+    bpy.context.scene.view_layers["ViewLayer"].use_pass_combined = True
+    bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
 
-        tree = bpy.context.scene.node_tree
+    tree = bpy.context.scene.node_tree
+    for node in tree.nodes:
+        tree.nodes.remove(node)
 
-        # clear default nodes
-        for node in tree.nodes:
-            tree.nodes.remove(node)
 
-        # create input layer node
-        layer_node = tree.nodes.new(type="CompositorNodeRLayers")
-        layer_node.location = 0, 0
+def set_main_composite_nodes(output_path):
+    setup()
 
-        # create output node
-        output_node = tree.nodes.new("CompositorNodeOutputFile")
+    tree = bpy.context.scene.node_tree
 
-        output_node.format.file_format = "OPEN_EXR"
-        output_node.format.color_mode = "RGB"
-        output_node.format.exr_codec = "ZIP"
-        output_node.format.color_depth = "32"
+    # create input layer node
+    layer_node = tree.nodes.new(type="CompositorNodeRLayers")
+    layer_node.location = 0, 0
 
-        output_node.file_slots.clear()
-        output_node.file_slots.new("Color#")
-        output_node.file_slots.new("Depth#")
+    # create output node
+    output_node = tree.nodes.new("CompositorNodeOutputFile")
 
-        output_node.base_path = bpy.path.relpath(output_path)
+    output_node.format.file_format = "OPEN_EXR"
+    output_node.format.color_mode = "RGB"
+    output_node.format.exr_codec = "ZIP"
+    output_node.format.color_depth = "32"
 
-        # create preview node
-        preview_node = tree.nodes.new("CompositorNodeOutputFile")
+    output_node.file_slots.clear()
+    output_node.file_slots.new("Color#")
+    output_node.file_slots.new("Depth#")
 
-        preview_node.format.file_format = "PNG"
-        preview_node.format.color_mode = "RGB"
+    output_node.base_path = bpy.path.relpath(output_path)
 
-        preview_node.file_slots.clear()
-        preview_node.file_slots.new("Preview#")
+    # create preview node
+    preview_node = tree.nodes.new("CompositorNodeOutputFile")
 
-        preview_node.base_path = bpy.path.relpath(output_path)
+    preview_node.format.file_format = "PNG"
+    preview_node.format.color_mode = "RGB"
 
-        # link nodes
-        links = tree.links
-        links.new(layer_node.outputs.get("Image"), preview_node.inputs.get("Preview#"))
-        links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Color#"))
-        links.new(layer_node.outputs.get("Depth"), output_node.inputs.get("Depth#"))
+    preview_node.file_slots.clear()
+    preview_node.file_slots.new("Preview#")
+
+    preview_node.base_path = bpy.path.relpath(output_path)
+
+    # link nodes
+    links = tree.links
+    links.new(layer_node.outputs.get("Image"), preview_node.inputs.get("Preview#"))
+    links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Color#"))
+    links.new(layer_node.outputs.get("Depth"), output_node.inputs.get("Depth#"))
+
+
+def set_env_composite_nodes(output_path):
+    setup()
+
+    tree = bpy.context.scene.node_tree
+
+    # create input layer node
+    layer_node = tree.nodes.new(type="CompositorNodeRLayers")
+    layer_node.location = 0, 0
+
+    # create output node
+    output_node = tree.nodes.new("CompositorNodeOutputFile")
+
+    output_node.format.file_format = "OPEN_EXR"
+    output_node.format.color_mode = "RGB"
+    output_node.format.exr_codec = "ZIP"
+    output_node.format.color_depth = "32"
+
+    output_node.file_slots.clear()
+    output_node.file_slots.new("Environment#")
+
+    output_node.base_path = bpy.path.relpath(output_path)
+
+    # link nodes
+    links = tree.links
+    links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Environment#"))

@@ -1,5 +1,6 @@
 import bpy
 from math import degrees
+from mathutils import Euler
 
 
 class Camera:
@@ -15,8 +16,18 @@ class Camera:
 
     def set_active(self, scene):
         scene.camera = self.object
+        self.object.data.type = "PERSP"
         scene.render.resolution_x = self.res_x
         scene.render.resolution_y = self.res_y
+
+    def set_env_probe_active(self, scene):
+        scene.camera = self.object
+        self.object.data.type = "PANO"
+        self.object.data.panorama_type = "EQUIRECTANGULAR"
+        scene.render.resolution_x = 1024
+        scene.render.resolution_y = 512
+
+        self.object.rotation_euler = Euler((90.0, 0.0, 0.0), "XYZ")
 
     def __lt__(self, other):
         return self.object.data["view_id"] < other.object.data["view_id"]
