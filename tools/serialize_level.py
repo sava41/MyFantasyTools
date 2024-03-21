@@ -1,6 +1,7 @@
 import sys
 import os
 import flatbuffers
+import mathutils
 
 build_mode = "Release"
 bin_path = os.path.abspath("./build/bin/Release/")
@@ -35,13 +36,59 @@ def process_navmesh(scene, cameras, output_path):
 
         for i, camera in enumerate(cameras):
             camera.adjacent_views = navmesh.find_adjacent_views(i)
+            convex_hull = navmesh.find_convex_hull_area(i)
+
+            trace_start = camera.main_camera.location
+            trace_end = trace_start + (
+                camera.main_camera.matrix_world.to_quaternion()
+                @ mathutils.Vector((0.0, 0.0, -10000.0))
+            )
+
+            point_close = trace_end
+            point_far = trace_start
+
+            for i in range(len(convex_hull)):
+                point_a = mathutils.Vector((convex_hull[i][0], convex_hull[i][1], 0))
+                point_b = mathutils.Vector(
+                    (convex_hull[i - 1][0], convex_hull[i - 1][1], 0)
+                )
+                plane_normal = mathutils.Vector((0.0, 0.0, 1.0)).cross(
+                    point_a - point_b
+                )
+
+                intersection = mathutils.geometry.intersect_line_plane(
+                    trace_start, trace_end, point_a, plane_normal
+                )
+
+                if intersection:
+                    ab_length = point_a - point_b
+                    ab_length.z = 0
+                    ab_length = ab_length.length
+                    ia_length = intersection - point_a
+                    ia_length.z = 0
+                    ia_length = ia_length.length
+                    ib_length = intersection - point_b
+                    ib_length.z = 0
+                    ib_length = ib_length.length
+
+                    if ia_length <= ab_length and ib_length <= ab_length:
+                        if (point_close - trace_start).length > (
+                            intersection - trace_start
+                        ).length:
+                            point_close = intersection
+                        if (point_far - trace_start).length < (
+                            intersection - trace_start
+                        ).length:
+                            point_far = intersection
+
+            camera.set_env_probe_location((point_close + point_far) * 0.5)
 
         builder = flatbuffers.Builder(4096)
 
         views = list()
         for camera in cameras:
 
-            camera_name = builder.CreateString(camera.object.name)
+            camera_name = builder.CreateString(camera.main_camera.name)
 
             mft.data.View.StartAdjacentViewsVector(builder, len(camera.adjacent_views))
             for adj_view in camera.adjacent_views:
@@ -53,7 +100,7 @@ def process_navmesh(scene, cameras, output_path):
             mft.data.View.AddFov(builder, camera.fov)
             mft.data.View.AddResX(builder, camera.res_x)
             mft.data.View.AddResY(builder, camera.res_y)
-            matrix_world = camera.object.matrix_world
+            matrix_world = camera.main_camera.matrix_world
             mft.data.View.AddWorldTransform(
                 builder,
                 mft.data.Mat4.CreateMat4(

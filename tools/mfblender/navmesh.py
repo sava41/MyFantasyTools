@@ -1,5 +1,6 @@
 import bpy
 import bmesh
+import mathutils
 
 
 class Navmesh:
@@ -9,16 +10,19 @@ class Navmesh:
 
         self.object.data.calc_loop_triangles()
 
-    def find_adjacent_views(self, view_id) -> list:
+    def select_edit_navmesh(self):
         bpy.ops.object.select_all(action="DESELECT")
         self.object.select_set(True)
         bpy.ops.object.mode_set(mode="EDIT")
 
-        # for i, polygon in enumerate(self.object.data.polygons):
-        #    self.object.data.polygons[i].select = view_data[i].value == view_id
+    def deselect_navmesh(self):
+        bpy.ops.object.mode_set(mode="OBJECT")
+        bpy.ops.object.select_all(action="DESELECT")
+
+    def find_adjacent_views(self, view_id) -> list:
+        self.select_edit_navmesh()
 
         bm = bmesh.from_edit_mesh(self.object.data)
-
         view_attribute = bm.faces.layers.int["Views"]
 
         adj_views = list()
@@ -29,10 +33,27 @@ class Navmesh:
                         if adj_face[view_attribute] is not view_id:
                             adj_views.append(adj_face[view_attribute])
 
-        bpy.ops.object.mode_set(mode="OBJECT")
-        bpy.ops.object.select_all(action="DESELECT")
+        self.deselect_navmesh()
 
         return set(adj_views)
+
+    def find_convex_hull_area(self, view_id) -> list:
+        self.select_edit_navmesh()
+
+        bm = bmesh.from_edit_mesh(self.object.data)
+        view_attribute = bm.faces.layers.int["Views"]
+
+        verts = list()
+        for face in bm.faces:
+            if face[view_attribute] is view_id:
+                for vert in face.verts:
+                    verts.append([vert.co.x, vert.co.y])
+
+        vert_indicies = mathutils.geometry.convex_hull_2d(verts)
+
+        self.deselect_navmesh()
+
+        return [verts[i] for i in vert_indicies if i < len(verts)]
 
 
 def create_navmesh_list(scene) -> list:

@@ -133,7 +133,7 @@ if __name__ == "__main__":
             filepath = Path(camera.render_output_path) / filename
             if filepath.is_file() and ".exr" in filename:
                 output_file = (
-                    camera.object.name + "_" + filename.replace("0.exr", ".jxl")
+                    camera.main_camera.name + "_" + filename.replace("0.exr", ".jxl")
                 )
                 output_file_path = output_path_final / "views" / output_file
 

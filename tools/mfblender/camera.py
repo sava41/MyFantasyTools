@@ -1,36 +1,43 @@
 import bpy
-from math import degrees
-from mathutils import Euler
+import mathutils
+import math
 
 
 class Camera:
     def __init__(self, object, output_path):
-        self.object = object
+        self.main_camera = object
         self.res_x = 1920
         self.res_y = 1080
         self.aspect = float(self.res_y) / float(self.res_x)
+        self.fov = math.degrees(object.data.angle)
         self.render_output_path = output_path + "//renders//" + object.name
         self.adjacent_views = {}
 
-        self.fov = degrees(object.data.angle)
+        self.main_camera.data.type = "PERSP"
+
+        self.env_camera = bpy.data.objects.new(
+            object.name + "_env", bpy.data.cameras.new(object.name + "_env")
+        )
+        bpy.context.scene.collection.objects.link(self.env_camera)
+        self.env_camera.rotation_euler[0] = math.radians(90)
+        self.env_camera.data.type = "PANO"
+        self.env_camera.data.panorama_type = "EQUIRECTANGULAR"
 
     def set_active(self, scene):
-        scene.camera = self.object
-        self.object.data.type = "PERSP"
+        scene.camera = self.main_camera
         scene.render.resolution_x = self.res_x
         scene.render.resolution_y = self.res_y
 
     def set_env_probe_active(self, scene):
-        scene.camera = self.object
-        self.object.data.type = "PANO"
-        self.object.data.panorama_type = "EQUIRECTANGULAR"
+        scene.camera = self.env_camera
         scene.render.resolution_x = 1024
         scene.render.resolution_y = 512
 
-        self.object.rotation_euler = Euler((90.0, 0.0, 0.0), "XYZ")
+    def set_env_probe_location(self, location):
+        self.env_camera.location = location
 
     def __lt__(self, other):
-        return self.object.data["view_id"] < other.object.data["view_id"]
+        return self.main_camera.data["view_id"] < other.main_camera.data["view_id"]
 
 
 def create_camera_list(scene, output_path) -> list:
