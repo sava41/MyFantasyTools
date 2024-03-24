@@ -27,80 +27,36 @@ import mft.data.Level
 import mft.data.Triangle
 
 
-def process_navmesh(scene, cameras, output_path):
+def process_navmesh(scene, views, output_path):
     navmeshes = mfblender.create_navmesh_list(scene)
 
     if len(navmeshes) > 0:
         navmesh = navmeshes[0]
         # mfblender.export_obj(navmesh.object, output_path)
 
-        for i, camera in enumerate(cameras):
-            camera.adjacent_views = navmesh.find_adjacent_views(i)
+        for i, view in enumerate(views):
+            view.adjacent_views = navmesh.find_adjacent_views(i)
             convex_hull = navmesh.find_convex_hull_area(i)
-
-            trace_start = camera.main_camera.location
-            trace_end = trace_start + (
-                camera.main_camera.matrix_world.to_quaternion()
-                @ mathutils.Vector((0.0, 0.0, -10000.0))
-            )
-
-            point_close = trace_end
-            point_far = trace_start
-
-            for i in range(len(convex_hull)):
-                point_a = mathutils.Vector((convex_hull[i][0], convex_hull[i][1], 0))
-                point_b = mathutils.Vector(
-                    (convex_hull[i - 1][0], convex_hull[i - 1][1], 0)
-                )
-                plane_normal = mathutils.Vector((0.0, 0.0, 1.0)).cross(
-                    point_a - point_b
-                )
-
-                intersection = mathutils.geometry.intersect_line_plane(
-                    trace_start, trace_end, point_a, plane_normal
-                )
-
-                if intersection:
-                    ab_length = point_a - point_b
-                    ab_length.z = 0
-                    ab_length = ab_length.length
-                    ia_length = intersection - point_a
-                    ia_length.z = 0
-                    ia_length = ia_length.length
-                    ib_length = intersection - point_b
-                    ib_length.z = 0
-                    ib_length = ib_length.length
-
-                    if ia_length <= ab_length and ib_length <= ab_length:
-                        if (point_close - trace_start).length > (
-                            intersection - trace_start
-                        ).length:
-                            point_close = intersection
-                        if (point_far - trace_start).length < (
-                            intersection - trace_start
-                        ).length:
-                            point_far = intersection
-
-            camera.set_env_probe_location((point_close + point_far) * 0.5)
+            view.set_env_probe_location(convex_hull)
 
         builder = flatbuffers.Builder(4096)
 
-        views = list()
-        for camera in cameras:
+        serialized_views = list()
+        for view in views:
 
-            camera_name = builder.CreateString(camera.main_camera.name)
+            name = builder.CreateString(view.main_camera.name)
 
-            mft.data.View.StartAdjacentViewsVector(builder, len(camera.adjacent_views))
-            for adj_view in camera.adjacent_views:
+            mft.data.View.StartAdjacentViewsVector(builder, len(view.adjacent_views))
+            for adj_view in view.adjacent_views:
                 builder.PrependUint16(adj_view)
             adjacent_views = builder.EndVector()
             mft.data.View.Start(builder)
-            mft.data.View.AddName(builder, camera_name)
-            mft.data.View.AddAspect(builder, float(camera.res_x) / float(camera.res_y))
-            mft.data.View.AddFov(builder, camera.fov)
-            mft.data.View.AddResX(builder, camera.res_x)
-            mft.data.View.AddResY(builder, camera.res_y)
-            matrix_world = camera.main_camera.matrix_world
+            mft.data.View.AddName(builder, name)
+            mft.data.View.AddAspect(builder, float(view.res_x) / float(view.res_y))
+            mft.data.View.AddFov(builder, view.fov)
+            mft.data.View.AddResX(builder, view.res_x)
+            mft.data.View.AddResY(builder, view.res_y)
+            matrix_world = view.main_camera.matrix_world
             mft.data.View.AddWorldTransform(
                 builder,
                 mft.data.Mat4.CreateMat4(
@@ -124,13 +80,13 @@ def process_navmesh(scene, cameras, output_path):
                 ),
             )
             mft.data.View.AddAdjacentViews(builder, adjacent_views)
-            view = mft.data.View.End(builder)
-            views.append(view)
+            serialized_view = mft.data.View.End(builder)
+            serialized_views.append(serialized_view)
 
-        mft.data.Level.StartViewsVector(builder, len(cameras))
-        for view in reversed(views):
-            builder.PrependUOffsetTRelative(view)
-        views = builder.EndVector()
+        mft.data.Level.StartViewsVector(builder, len(views))
+        for serialized_view in reversed(serialized_views):
+            builder.PrependUOffsetTRelative(serialized_view)
+        serialized_views = builder.EndVector()
 
         mft.data.Level.StartNavmeshVertsVector(
             builder, len(navmesh.object.data.vertices)
@@ -163,7 +119,7 @@ def process_navmesh(scene, cameras, output_path):
         mft.data.Level.Start(builder)
         mft.data.Level.AddNavmeshVerts(builder, navmesh_verts)
         mft.data.Level.AddNavmeshTris(builder, navmesh_tris)
-        mft.data.Level.AddViews(builder, views)
+        mft.data.Level.AddViews(builder, serialized_views)
         mft.data.Level.AddDataPath(builder, level_data_path)
         mft.data.Level.AddName(builder, level_name)
         level = mft.data.Level.End(builder)

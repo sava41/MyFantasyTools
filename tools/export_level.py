@@ -102,22 +102,22 @@ if __name__ == "__main__":
 
     scene = bpy.data.scenes["Scene"]
     scene.frame_set(0)
-    cameras = mfblender.create_camera_list(scene, str(output_path_root.resolve()))
+    views = mfblender.create_view_list(scene, str(output_path_root.resolve()))
 
     # Serialize Level
-    serialize_level.process_navmesh(scene, cameras, str(output_path_final.resolve()))
+    serialize_level.process_navmesh(scene, views, str(output_path_final.resolve()))
 
     # Render Settings
     set_cycles_renderer(scene, num_samples)
 
     # Render
-    for camera in cameras:
-        camera.set_active(scene)
-        mfblender.set_main_composite_nodes(camera.render_output_path)
+    for view in views:
+        view.set_active(scene)
+        mfblender.set_main_composite_nodes(view.render_output_path)
         bpy.ops.render.render(scene=scene.name)
 
-        camera.set_env_probe_active(scene)
-        mfblender.set_env_composite_nodes(camera.render_output_path)
+        view.set_env_probe_active(scene)
+        mfblender.set_env_composite_nodes(view.render_output_path)
         bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
@@ -125,15 +125,15 @@ if __name__ == "__main__":
     if not (output_path_final / "views").exists():
         os.makedirs(output_path_final / "views")
 
-    for camera in cameras:
-        if not Path(camera.render_output_path).exists():
-            print("Render does not exist: " + camera.render_output_path)
+    for view in views:
+        if not Path(view.render_output_path).exists():
+            print("Render does not exist: " + view.render_output_path)
             continue
-        for filename in os.listdir(camera.render_output_path):
-            filepath = Path(camera.render_output_path) / filename
+        for filename in os.listdir(view.render_output_path):
+            filepath = Path(view.render_output_path) / filename
             if filepath.is_file() and ".exr" in filename:
                 output_file = (
-                    camera.main_camera.name + "_" + filename.replace("0.exr", ".jxl")
+                    view.main_camera.name + "_" + filename.replace("0.exr", ".jxl")
                 )
                 output_file_path = output_path_final / "views" / output_file
 

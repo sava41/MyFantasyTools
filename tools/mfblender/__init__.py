@@ -1,4 +1,4 @@
 from mfblender.composite import *
 from mfblender.export import *
-from mfblender.camera import *
+from mfblender.view import *
 from mfblender.navmesh import *
