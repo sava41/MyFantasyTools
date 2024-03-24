@@ -84,9 +84,8 @@ bool encode_oneshot(const uint32_t xsize, const uint32_t ysize,
   return true;
 }
 
-bool decode_oneshot(std::vector<char>& compressed, std::vector<float>& pixels,
-                    size_t& xsize, size_t& ysize,
-                    std::vector<uint8_t>& iccProfile) {
+bool decode_oneshot(std::vector<char>& compressed,
+                    const buffer_allocator& allocator) {
   // Multi-threaded parallel runner.
   auto runner = JxlResizableParallelRunnerMake(nullptr);
 
@@ -107,7 +106,6 @@ bool decode_oneshot(std::vector<char>& compressed, std::vector<float>& pixels,
   }
 
   JxlBasicInfo info;
-  JxlPixelFormat format = {4, JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0};
 
   JxlDecoderSetInput(dec.get(), reinterpret_cast<uint8_t*>(compressed.data()),
                      compressed.size());
@@ -127,8 +125,7 @@ bool decode_oneshot(std::vector<char>& compressed, std::vector<float>& pixels,
         fprintf(stderr, "JxlDecoderGetBasicInfo failed\n");
         return false;
       }
-      xsize = info.xsize;
-      ysize = info.ysize;
+
       JxlResizableParallelRunnerSetThreads(
           runner.get(),
           JxlResizableParallelRunnerSuggestThreads(info.xsize, info.ysize));
@@ -141,7 +138,7 @@ bool decode_oneshot(std::vector<char>& compressed, std::vector<float>& pixels,
         fprintf(stderr, "JxlDecoderGetICCProfileSize failed\n");
         return false;
       }
-      iccProfile.resize(icc_size);
+      std::vector<uint8_t> iccProfile(icc_size);
       if (JXL_DEC_SUCCESS != JxlDecoderGetColorAsICCProfile(
                                  dec.get(), JXL_COLOR_PROFILE_TARGET_DATA,
                                  iccProfile.data(), iccProfile.size())) {
@@ -149,22 +146,25 @@ bool decode_oneshot(std::vector<char>& compressed, std::vector<float>& pixels,
         return false;
       }
     } else if (status == JXL_DEC_NEED_IMAGE_OUT_BUFFER) {
-      size_t buffer_size;
+      size_t bufferSize;
+      JxlPixelFormat format = {info.num_color_channels, JXL_TYPE_FLOAT,
+                               JXL_NATIVE_ENDIAN, 0};
       if (JXL_DEC_SUCCESS !=
-          JxlDecoderImageOutBufferSize(dec.get(), &format, &buffer_size)) {
+          JxlDecoderImageOutBufferSize(dec.get(), &format, &bufferSize)) {
         fprintf(stderr, "JxlDecoderImageOutBufferSize failed\n");
         return false;
       }
-      if (buffer_size != xsize * ysize * 16) {
-        fprintf(stderr, "Invalid out buffer size\n");
+
+      void* pixelsBuffer = allocator(info.xsize, info.ysize,
+                                     info.num_color_channels, bufferSize);
+
+      if (pixelsBuffer == nullptr) {
         return false;
       }
-      pixels.resize(xsize * ysize * 4);
-      void* pixels_buffer = (void*)pixels.data();
-      size_t pixels_buffer_size = pixels.size() * sizeof(float);
+
       if (JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer(dec.get(), &format,
-                                                         pixels_buffer,
-                                                         pixels_buffer_size)) {
+                                                         pixelsBuffer,
+                                                         bufferSize)) {
         fprintf(stderr, "JxlDecoderSetImageOutBuffer failed\n");
         return false;
       }

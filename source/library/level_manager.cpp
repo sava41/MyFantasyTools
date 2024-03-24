@@ -53,37 +53,46 @@ class ViewData {
   bool loaded() const { return m_loaded; }
 
   bool load_data() {
-    size_t fileSizex, fileSizey;
-    std::vector<uint8_t> iccProfile;
-
     {
-      m_colorBuffer.reserve(m_sizex * m_sizey * sizeof(float));
       std::vector<char> compressed = read_binary(m_colorBinPath);
-      bool res = jxl::decode_oneshot(compressed, m_colorBuffer, fileSizex,
-                                     fileSizey, iccProfile);
-      if (fileSizex != m_sizex || fileSizey != m_sizey || !res) {
+      bool res = jxl::decode_oneshot(compressed,
+                                     [this](int sizex, int sizey, int channels,
+                                            size_t bufferSize) -> void* {
+                                       m_colorBuffer.reserve(bufferSize);
+
+                                       return m_colorBuffer.data();
+                                     });
+      if (!res) {
         unload_data();
         return false;
       }
     }
 
     {
-      m_depthBuffer.reserve(m_sizex * m_sizey * sizeof(float));
       std::vector<char> compressed = read_binary(m_depthBinPath);
-      bool res = jxl::decode_oneshot(compressed, m_depthBuffer, fileSizex,
-                                     fileSizey, iccProfile);
-      if (fileSizex != m_sizex || fileSizey != m_sizey || !res) {
+      bool res = jxl::decode_oneshot(compressed,
+                                     [this](int sizex, int sizey, int channels,
+                                            size_t bufferSize) -> void* {
+                                       m_depthBuffer.reserve(bufferSize);
+
+                                       return m_depthBuffer.data();
+                                     });
+      if (!res) {
         unload_data();
         return false;
       }
     }
 
     {
-      m_envBuffer.reserve(1024 * 512 * sizeof(float));
       std::vector<char> compressed = read_binary(m_envBinPath);
-      bool res = jxl::decode_oneshot(compressed, m_envBuffer, fileSizex,
-                                     fileSizey, iccProfile);
-      if (fileSizex != 1024 || fileSizey != 512 || !res) {
+      bool res = jxl::decode_oneshot(compressed,
+                                     [this](int sizex, int sizey, int channels,
+                                            size_t bufferSize) -> void* {
+                                       m_envBuffer.reserve(bufferSize);
+
+                                       return m_envBuffer.data();
+                                     });
+      if (!res) {
         unload_data();
         return false;
       }
