@@ -161,10 +161,14 @@ LevelManager::~LevelManager() = default;
 bool LevelManager::load_level(const std::string& pathString) {
   const std::filesystem::path levelFilePath(pathString);
 
-  m_views.clear();
-  m_dataBuffer.clear();
+  std::vector<char> dataBuffer = read_binary(levelFilePath);
 
-  m_dataBuffer = read_binary(levelFilePath);
+  if (dataBuffer.empty()) {
+    return false;
+  }
+
+  m_views.clear();
+  m_dataBuffer = std::move(dataBuffer);
 
   const auto* level =
       data::GetLevel(reinterpret_cast<void*>(m_dataBuffer.data()));
