@@ -91,6 +91,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Args
+    input_filename = sys.argv[1][0:-6]
     input_file = Path(sys.argv[1])
     output_path_root = Path(sys.argv[2])
     resolution_percentage = int(sys.argv[3])
@@ -166,4 +167,9 @@ if __name__ == "__main__":
         str((output_path_root / "mft_level_data").resolve()),
         format="zip",
         root_dir=str(output_path_final.resolve()),
+    )
+
+    os.rename(
+        (output_path_root / "mft_level_data.zip").resolve(),
+        (output_path_root / (input_filename + ".mflevel")).resolve(),
     )
