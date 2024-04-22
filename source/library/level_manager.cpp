@@ -1,6 +1,6 @@
+
 #include "level_manager.h"
 
-#include <filesystem>
 #include <fstream>
 #include <limits>
 
@@ -8,155 +8,13 @@
 #include "jxl.h"
 #include "level_generated.h"
 #include "math.h"
+#include "view_data.h"
 
 namespace mft {
 
-class ViewData {
- public:
-  ViewData(const std::string& name, int sizex, int sizey, float fov,
-           const std::filesystem::path& dataDir)
-      : m_name(name),
-        m_sizex(sizex),
-        m_sizey(sizey),
-        m_fov(fov),
-        m_aspectRatio(static_cast<float>(sizex) / static_cast<float>(sizey)),
-        m_colorBinPath(dataDir / std::filesystem::path(name + "_Color.jxl")),
-        m_depthBinPath(dataDir / std::filesystem::path(name + "_Depth.jxl")),
-        m_envBinPath(dataDir /
-                     std::filesystem::path(name + "_Environment.jxl")),
-        m_loaded(false){};
-  ~ViewData() = default;
-
-  ViewData(const ViewData&) = delete;
-  ViewData& operator=(const ViewData&) = delete;
-  ViewData& operator=(ViewData&&) = delete;
-
-  ViewData(ViewData&& other) noexcept
-      : m_name(std::move(other.m_name)),
-        m_sizex(other.m_sizex),
-        m_sizey(other.m_sizey),
-        m_aspectRatio(other.m_aspectRatio),
-        m_fov(other.m_fov),
-        m_colorBinPath(std::move(other.m_colorBinPath)),
-        m_depthBinPath(std::move(other.m_depthBinPath)),
-        m_envBinPath(std::move(other.m_envBinPath)),
-        m_loaded(other.m_loaded.load()),
-        m_colorBuffer(std::move(other.m_colorBuffer)),
-        m_depthBuffer(std::move(other.m_depthBuffer)),
-        m_envBuffer(std::move(other.m_envBuffer)) {
-    other.m_loaded.store(false);
-    m_sizex = 0;
-    m_sizey = 0;
-    m_aspectRatio = 0.0;
-  };
-
-  bool loaded() const { return m_loaded; }
-
-  bool load_data() {
-    {
-      std::vector<char> compressed = read_binary(m_colorBinPath);
-      bool res = jxl::decode_oneshot(compressed,
-                                     [this](int sizex, int sizey, int channels,
-                                            size_t bufferSize) -> void* {
-                                       m_colorBuffer.reserve(bufferSize);
-
-                                       return m_colorBuffer.data();
-                                     });
-      if (!res) {
-        unload_data();
-        return false;
-      }
-    }
-
-    {
-      std::vector<char> compressed = read_binary(m_depthBinPath);
-      bool res = jxl::decode_oneshot(compressed,
-                                     [this](int sizex, int sizey, int channels,
-                                            size_t bufferSize) -> void* {
-                                       m_depthBuffer.reserve(bufferSize);
-
-                                       return m_depthBuffer.data();
-                                     });
-      if (!res) {
-        unload_data();
-        return false;
-      }
-    }
-
-    {
-      std::vector<char> compressed = read_binary(m_envBinPath);
-      bool res = jxl::decode_oneshot(compressed,
-                                     [this](int sizex, int sizey, int channels,
-                                            size_t bufferSize) -> void* {
-                                       m_envBuffer.reserve(bufferSize);
-
-                                       return m_envBuffer.data();
-                                     });
-      if (!res) {
-        unload_data();
-        return false;
-      }
-    }
-
-    m_loaded = true;
-
-    return true;
-  };
-
-  void unload_data() {
-    m_depthBuffer.clear();
-    m_colorBuffer.clear();
-
-    m_loaded = false;
-  }
-
-  std::string get_name() const { return m_name; }
-
-  int get_res_x() const { return m_sizex; }
-
-  int get_res_y() const { return m_sizey; }
-
-  float get_fov() const { return m_fov; }
-
-  const float* get_color_buffer() const {
-    if (!m_loaded) return nullptr;
-
-    return m_colorBuffer.data();
-  }
-
-  const float* get_depth_buffer() const {
-    if (!m_loaded) return nullptr;
-
-    return m_depthBuffer.data();
-  }
-
-  const float* get_env_buffer() const {
-    if (!m_loaded) return nullptr;
-
-    return m_envBuffer.data();
-  }
-
- private:
-  std::string m_name;
-
-  int m_sizex;
-  int m_sizey;
-  float m_aspectRatio;
-  float m_fov;
-
-  std::filesystem::path m_colorBinPath;
-  std::filesystem::path m_depthBinPath;
-  std::filesystem::path m_envBinPath;
-
-  std::vector<float> m_colorBuffer;
-  std::vector<float> m_depthBuffer;
-  std::vector<float> m_envBuffer;
-
-  std::atomic<bool> m_loaded;
-};
-
-LevelManager::LevelManager() = default;
-LevelManager::~LevelManager() = default;
+LevelManager::LevelManager(ViewDataFactory factory)
+    : m_viewFactory(std::move(factory)) {}
+LevelManager::~LevelManager() { m_views.clear(); }
 
 bool LevelManager::load_level(const std::string& pathString) {
   const std::filesystem::path levelFilePath(pathString);
@@ -186,9 +44,24 @@ bool LevelManager::load_level(const std::string& pathString) {
   for (int i = 0; i < viewsData->size(); ++i) {
     const auto* const viewData = viewsData->Get(i);
 
-    m_views.emplace_back(viewData->name()->str(), viewData->res_x(),
-                         viewData->res_y(), viewData->fov(), dataFilePath);
-    m_views.back().load_data();
+    const auto* worldTransformPtr = viewData->world_transform();
+    const std::array<float, MAT4_SIZE> transform(
+        {worldTransformPtr->m00(), worldTransformPtr->m01(),
+         worldTransformPtr->m02(), worldTransformPtr->m03(),
+         worldTransformPtr->m10(), worldTransformPtr->m11(),
+         worldTransformPtr->m12(), worldTransformPtr->m13(),
+         worldTransformPtr->m20(), worldTransformPtr->m21(),
+         worldTransformPtr->m22(), worldTransformPtr->m23(),
+         worldTransformPtr->m30(), worldTransformPtr->m31(),
+         worldTransformPtr->m32(), worldTransformPtr->m33()});
+
+    m_views.emplace_back(m_viewFactory(
+        viewData->name()->str(), dataFilePath,
+        ViewData::Color | ViewData::Depth | ViewData::Environment));
+
+    m_views.back()->load_camera_data(transform, viewData->res_x(),
+                                     viewData->res_y(), viewData->fov());
+    m_views.back()->load_image_data();
 
     printf("loaded %s\n", viewData->name()->c_str());
   }
@@ -198,70 +71,10 @@ bool LevelManager::load_level(const std::string& pathString) {
 
 int LevelManager::get_views_length() const { return m_views.size(); }
 
-std::string LevelManager::get_view_name(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return "";
-
-  return m_views.at(viewIndex).get_name();
-}
-
-int LevelManager::get_view_width(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return 0;
-
-  return m_views.at(viewIndex).get_res_x();
-}
-
-int LevelManager::get_view_height(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return 0;
-
-  return m_views.at(viewIndex).get_res_y();
-}
-
-std::array<float, MAT4_SIZE> LevelManager::get_view_tranform(
-    int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return {};
-
-  const auto* level =
-      data::GetLevel(reinterpret_cast<const void*>(m_dataBuffer.data()));
-
-  const auto* worldTransform =
-      level->views()->Get(viewIndex)->world_transform();
-
-  return {worldTransform->m00(), worldTransform->m01(), worldTransform->m02(),
-          worldTransform->m03(), worldTransform->m10(), worldTransform->m11(),
-          worldTransform->m12(), worldTransform->m13(), worldTransform->m20(),
-          worldTransform->m21(), worldTransform->m22(), worldTransform->m23(),
-          worldTransform->m30(), worldTransform->m31(), worldTransform->m32(),
-          worldTransform->m33()};
-}
-
-float LevelManager::get_view_fov(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return 0;
-
-  return m_views.at(viewIndex).get_fov();
-}
-
-float* LevelManager::get_view_color_buffer(int viewIndex) const {
+ViewData* LevelManager::get_view(int viewIndex) {
   if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
 
-  if (!m_views.at(viewIndex).loaded()) return nullptr;
-
-  return const_cast<float*>(m_views.at(viewIndex).get_color_buffer());
-}
-
-float* LevelManager::get_view_depth_buffer(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
-
-  if (!m_views.at(viewIndex).loaded()) return nullptr;
-
-  return const_cast<float*>(m_views.at(viewIndex).get_depth_buffer());
-}
-
-float* LevelManager::get_view_env_buffer(int viewIndex) const {
-  if (0 > viewIndex || viewIndex >= get_views_length()) return nullptr;
-
-  if (!m_views.at(viewIndex).loaded()) return nullptr;
-
-  return const_cast<float*>(m_views.at(viewIndex).get_env_buffer());
+  return m_views.at(viewIndex).get();
 }
 
 std::vector<int> LevelManager::get_adjacent_views(int viewIndex) const {

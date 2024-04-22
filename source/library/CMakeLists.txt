@@ -1,4 +1,4 @@
-add_library(mflib STATIC level_manager.cpp level_manager.h math.h)
+add_library(mflib STATIC level_manager.cpp level_manager.h view_data.cpp view_data.h math.h)
 add_dependencies(mflib mfutilities flatc generate_flatbuffers)
 target_include_directories(mflib PRIVATE ${GENERATED_DIR})
 target_link_libraries(mflib PRIVATE mfutilities flatbuffers)

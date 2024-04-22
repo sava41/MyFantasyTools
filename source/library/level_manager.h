@@ -1,35 +1,29 @@
 
-
 #pragma once
 
 #include <array>
+#include <filesystem>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-
-constexpr int MAT4_SIZE = 16;
 
 namespace mft {
 
 class ViewData;
 
+using ViewDataFactory = std::function<std::unique_ptr<ViewData>(
+    const std::string&, const std::filesystem::path&, unsigned int)>;
+
 class LevelManager {
  public:
-  LevelManager();
+  LevelManager(ViewDataFactory factory);
   ~LevelManager();
 
   bool load_level(const std::string& path);
   int get_views_length() const;
 
-  std::string get_view_name(int viewIndex) const;
-  int get_view_width(int viewIndex) const;
-  int get_view_height(int viewIndex) const;
-  std::array<float, MAT4_SIZE> get_view_tranform(int viewIndex) const;
-  float get_view_fov(int viewIndex) const;
-
-  float* get_view_color_buffer(int viewIndex) const;
-  float* get_view_depth_buffer(int viewIndex) const;
-  float* get_view_env_buffer(int viewIndex) const;
+  ViewData* get_view(int viewIndex);
 
   std::vector<int> get_adjacent_views(int viewIndex) const;
 
@@ -40,7 +34,8 @@ class LevelManager {
 
  private:
   std::vector<char> m_dataBuffer;
-  std::vector<ViewData> m_views;
+  std::vector<std::unique_ptr<ViewData>> m_views;
+  ViewDataFactory m_viewFactory;
 };
 
 }  // namespace mft
