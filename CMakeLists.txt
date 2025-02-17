@@ -63,3 +63,6 @@ add_subdirectory(source/flatbuffers)
 add_subdirectory(source/utilities)
 add_subdirectory(source/python)
 add_subdirectory(source/library)
+
+# configure installation
+set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})

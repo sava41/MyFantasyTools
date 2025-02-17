@@ -1,6 +1,8 @@
 CMakeLists.txt.user
 .vscode/settings.json
 
+*.DS_Store
+
 # Prerequisites
 *.d
 
@@ -43,3 +45,5 @@ CMakeLists.txt.user
 # Folders
 build/
 output/
+plugins/
+libraries/

@@ -13,20 +13,15 @@ This project is a pipeline for making pre-rendered background games in the style
 ## Building
 Install python dependancies:
 ```bash
-> pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-### Windows
 Build project:
 ```bash
-> mkdir build 
-> cd build 
-> cmake ..
-> cmake --build . --target mflib mftools --config <Mode>
+cmake -B build -DCMAKE_BUILD_TYPE=<type>
+cmake --build build --target mflib mftools --config <type>
+cmake --install build --component mft
 ```
-
-### Linux
-**tbd**
 
 ## Usage
 

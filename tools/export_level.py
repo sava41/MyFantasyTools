@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 import bpy
 import numpy as np
+import platform
 
 if sys.version_info[0] != 3 and sys.version_info[1] != 10:
     raise Exception("Must be using Python 3.10")
@@ -11,11 +12,8 @@ if sys.version_info[0] != 3 and sys.version_info[1] != 10:
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2
 
-build_mode = "Release"
-bin_path = os.path.abspath("./build/bin/Release/")
-if not os.path.isdir(bin_path):
-    bin_path = os.path.abspath("./build/bin/Debug/")
-    build_mode = "Debug"
+
+bin_path = os.path.abspath("./plugins")
 if not os.path.isdir(bin_path):
     print("binary path not found. Please build project before using tools")
     quit()
@@ -46,7 +44,7 @@ def set_cycles_renderer(
     num_samples: int,
     use_denoising: bool = True,
     use_transparent_bg: bool = False,
-    prefer_optix_use: bool = True,
+    prefer_gpu_use: bool = True,
     use_adaptive_sampling: bool = False,
 ):
     scene.render.image_settings.file_format = "OPEN_EXR"
@@ -62,13 +60,16 @@ def set_cycles_renderer(
 
     # Enable GPU acceleration
     # Source - https://blender.stackexchange.com/a/196702
-    if prefer_optix_use:
+    if prefer_gpu_use:
         bpy.context.scene.cycles.device = "GPU"
 
-        # Change the preference setting
-        bpy.context.preferences.addons[
-            "cycles"
-        ].preferences.compute_device_type = "OPTIX"
+        #find operating system
+        os_type = platform.system()
+        
+        if os_type == "Darwin":  # macOS
+            bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "METAL"
+        else:  # Windows or Linux
+            bpy.context.preferences.addons["cycles"].preferences.compute_device_type = "OPTIX"
 
     # Call get_devices() to let Blender detects GPU device (if any)
     bpy.context.preferences.addons["cycles"].preferences.get_devices()

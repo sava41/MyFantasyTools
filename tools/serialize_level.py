@@ -3,11 +3,7 @@ import os
 import flatbuffers
 import mathutils
 
-build_mode = "Release"
-bin_path = os.path.abspath("./build/bin/Release/")
-if not os.path.isdir(bin_path):
-    bin_path = os.path.abspath("./build/bin/Debug/")
-    build_mode = "Debug"
+bin_path = os.path.abspath("./plugins")
 if not os.path.isdir(bin_path):
     print("binary path not found. Please build project before using tools")
     quit()
