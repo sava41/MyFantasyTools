@@ -1,0 +1,2 @@
+
+INSTALL(FILES __init__.py COMPONENT mft DESTINATION plugins)

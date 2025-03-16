@@ -47,3 +47,4 @@ build/
 output/
 plugins/
 libraries/
+venv/
