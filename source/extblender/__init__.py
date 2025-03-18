@@ -1,3 +1,7 @@
+import bpy
+from bpy.types import Panel, Operator
+import mftools
+
 bl_info = {
     "name": "Add Cube Panel",
     "author": "Your Name",
@@ -7,10 +11,6 @@ bl_info = {
     "description": "Adds a panel with a button to create a cube",
     "category": "3D View",
 }
-
-import mftools
-import bpy
-from bpy.types import Panel, Operator
 
 class ADD_OT_cube(Operator):
     """Add a cube to the scene"""

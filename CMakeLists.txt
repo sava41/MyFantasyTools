@@ -3,7 +3,7 @@ project(MyFantasyTools)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Python 3.10 EXACT COMPONENTS Interpreter Development REQUIRED)
+find_package(Python 3.11 EXACT COMPONENTS Interpreter Development REQUIRED)
 
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/external)
 
