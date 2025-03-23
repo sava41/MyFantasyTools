@@ -45,6 +45,6 @@ CMakeLists.txt.user
 # Folders
 build/
 output/
-plugins/
+blender_addon/
 libraries/
 venv/
