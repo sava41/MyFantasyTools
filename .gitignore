@@ -41,6 +41,7 @@ CMakeLists.txt.user
 
 # Blender
 *.blend
+blender_addon.zip
 
 # Folders
 build/
