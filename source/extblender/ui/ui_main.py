@@ -188,12 +188,10 @@ class MFT_PT_MainPanel(Panel):
         col = row.column(align=True)
         col.operator("mf.add_camera", icon='ADD', text="")
         col.operator("mf.remove_camera", icon='REMOVE', text="")
-
-        box = layout.box()
-        box.label(text=f"Camera: {camera_item.camera.name}")
         
         if scene.mf_camera_index >= 0 and scene.mf_camera_index < len(scene.mf_cameras):
             camera_item = scene.mf_cameras[scene.mf_camera_index]
+            box.label(text="{camera_item.camera.name} Properties:")
             box.prop(camera_item, "max_pan")
             box.prop(camera_item, "max_tilt")
         
