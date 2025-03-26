@@ -4,7 +4,8 @@ from bpy.props import (
     StringProperty, 
     PointerProperty, 
     CollectionProperty,
-    BoolProperty
+    BoolProperty,
+    FloatProperty
 )
 import os
 
@@ -21,6 +22,22 @@ class MFT_CameraListItem(PropertyGroup):
         name="Enabled",
         description="Use this camera for rendering",
         default=True
+    )
+    max_pan: FloatProperty(
+        name="Max Pan",
+        description="Maximum pan angle in degrees",
+        default=45.0,
+        min=0.0,
+        max=360.0,
+        subtype='ANGLE'
+    )
+    max_tilt: FloatProperty(
+        name="Max Tilt",
+        description="Maximum tilt angle in degrees",
+        default=30.0,
+        min=0.0,
+        max=90.0,
+        subtype='ANGLE'
     )
 
 # Camera UIList
@@ -84,7 +101,7 @@ class MFT_OT_RemoveCamera(Operator):
 class MFT_OT_RenderScenes(Operator):
     """Render scenes from all enabled cameras"""
     bl_idname = "mf.render_scenes"
-    bl_label = "Render and export"
+    bl_label = "Export"
     bl_description = "Render images from all enabled cameras to the export path"
     
     def execute(self, context):
@@ -171,6 +188,14 @@ class MFT_PT_MainPanel(Panel):
         col = row.column(align=True)
         col.operator("mf.add_camera", icon='ADD', text="")
         col.operator("mf.remove_camera", icon='REMOVE', text="")
+
+        box = layout.box()
+        box.label(text=f"Camera: {camera_item.camera.name}")
+        
+        if scene.mf_camera_index >= 0 and scene.mf_camera_index < len(scene.mf_cameras):
+            camera_item = scene.mf_cameras[scene.mf_camera_index]
+            box.prop(camera_item, "max_pan")
+            box.prop(camera_item, "max_tilt")
         
         # Target mesh section
         box = layout.box()
