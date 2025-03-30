@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+
+id = "mft"
+version = "1.0.0"
+name = "My Fantasy Tools"
+tagline = "Make pre-rendered background games"
+maintainer = "Sava"
+type = "add-on"
+blender_version_min = "4.2.0"
+license = ["SPDX:MIT",]
+website = "https://github.com/sava41/MyFantasyTools"
+
+[permissions]
+files = "Exporting data"

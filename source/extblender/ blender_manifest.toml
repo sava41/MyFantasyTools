@@ -1,7 +1,0 @@
-name = "My Fantasy Tools"
-author = "Sava"
-version = [1, 0]
-blender = [4, 0, 0]
-location = "View3D > UI > My Fantasy Tools"
-description = "Make pre-rendered background games"
-category = "3D View"
