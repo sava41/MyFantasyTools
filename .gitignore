@@ -41,11 +41,11 @@ CMakeLists.txt.user
 
 # Blender
 *.blend
-blender_addon.zip
+mft_blender_addon.zip
 
 # Folders
 build/
 output/
-blender_addon/
+mft_blender_addon/
 libraries/
 venv/

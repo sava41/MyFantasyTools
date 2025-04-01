@@ -3,7 +3,7 @@ import os
 import flatbuffers
 import mathutils
 
-bin_path = os.path.abspath("./blender_addon")
+bin_path = os.path.abspath("./mft_blender_addon")
 if not os.path.isdir(bin_path):
     print("binary path not found. Please build project before using tools")
     quit()

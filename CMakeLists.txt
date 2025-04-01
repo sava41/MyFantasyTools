@@ -14,18 +14,21 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
+if(NOT CMAKE_INSTALL_PREFIX)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
+endif()
 
-set(BLENDER_PACKAGES_DIR ${CMAKE_BINARY_DIR}/blender_packages)
+set(BLENDER_WHEELS_DIR ${CMAKE_BINARY_DIR}/wheels)
 file(MAKE_DIRECTORY ${BLENDER_PACKAGES_DIR})
 
 add_subdirectory(source/cpp)
 add_subdirectory(source/extblender)
 
 add_custom_target(install_python_requirements
-    COMMAND ${Python_EXECUTABLE} -m pip install -r ${CMAKE_CURRENT_SOURCE_DIR}/requirements.txt --target ${BLENDER_PACKAGES_DIR}
+    COMMAND ${Python_EXECUTABLE} -m pip download -r ${CMAKE_CURRENT_SOURCE_DIR}/requirements.txt --dest ${BLENDER_WHEELS_DIR} --only-binary=:all: --python-version=3.11 --platform=macosx_11_0_arm64
+    COMMAND ${Python_EXECUTABLE} -m pip download -r ${CMAKE_CURRENT_SOURCE_DIR}/requirements.txt --dest ${BLENDER_WHEELS_DIR} --only-binary=:all: --python-version=3.11 --platform=win_amd64
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_dependencies(mftools install_python_requirements)
 
-install( DIRECTORY ${BLENDER_PACKAGES_DIR} COMPONENT mft DESTINATION blender_addon/external)
+install( DIRECTORY ${BLENDER_WHEELS_DIR} COMPONENT mft DESTINATION mft_blender_addon)

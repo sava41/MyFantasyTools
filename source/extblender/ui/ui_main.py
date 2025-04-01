@@ -191,7 +191,7 @@ class MFT_PT_MainPanel(Panel):
         
         if scene.mf_camera_index >= 0 and scene.mf_camera_index < len(scene.mf_cameras):
             camera_item = scene.mf_cameras[scene.mf_camera_index]
-            box.label(text="{camera_item.camera.name} Properties:")
+            box.label(text="{} Properties:".format(camera_item.camera.name))
             box.prop(camera_item, "max_pan")
             box.prop(camera_item, "max_tilt")
         

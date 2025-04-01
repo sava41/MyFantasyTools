@@ -22,7 +22,7 @@ cmake --install build --component mft
 ## Usage
 
 ### Blender Add-on
-The Blender add-on automates exporting a Blender scene into an MFT level. After building and installing the project, the `blender_addon` directory can be zipped and installed using the `Install from disk` option in Blenders settings. Pre-built addons can be found in the releases (Windows and MacOs only).
+The Blender add-on automates exporting a Blender scene into an MFT level. After building and installing the project, the `mft_blender_addon` directory can be zipped and installed using the `Install from disk` option in Blenders settings. Pre-built addons can be found in the releases (Windows and MacOs only).
 
 ### C++ Library
 **tbd:** The libary has an api to read MFT level files and stream level data for use with a game engine.

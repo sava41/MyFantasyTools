@@ -13,7 +13,7 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2
 
 
-bin_path = os.path.abspath("./blender_addon")
+bin_path = os.path.abspath("./mft_blender_addon")
 if not os.path.isdir(bin_path):
     print("binary path not found. Please build project before using tools")
     quit()
