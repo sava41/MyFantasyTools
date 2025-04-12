@@ -3,19 +3,19 @@ import sys
 import os
 import importlib
 
-__external_path__ = os.path.join(os.path.dirname(__file__), "external")
-
-if __external_path__ not in sys.path:
-    sys.path.append(__external_path__)
-
 from . ui import ui_main
+from . core import data_models
 from . import mftools
 
 def register():
+    importlib.reload(data_models)
     importlib.reload(ui_main)
+
+    data_models.register()
     ui_main.register()
 
 def unregister():
+    data_models.unregister()
     ui_main.unregister()
 
 if __name__ == "__main__":
