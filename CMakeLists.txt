@@ -19,7 +19,6 @@ set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 endif()
 
 set(BLENDER_WHEELS_DIR ${CMAKE_BINARY_DIR}/wheels)
-file(MAKE_DIRECTORY ${BLENDER_PACKAGES_DIR})
 
 add_subdirectory(source/cpp)
 add_subdirectory(source/extblender)

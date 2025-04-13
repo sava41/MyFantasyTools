@@ -41,9 +41,12 @@ class MFT_PT_MainPanel(Panel):
         
         if scene.mft_camera_index >= 0 and scene.mft_camera_index < len(scene.mft_cameras):
             camera_item = scene.mft_cameras[scene.mft_camera_index]
-            box.label(text="{} Properties:".format(camera_item.camera.name))
-            box.prop(camera_item, "max_pan")
-            box.prop(camera_item, "max_tilt")
+            if camera_item.camera:  # Check if camera exists
+                box.label(text=f"{camera_item.camera.name} Properties:")
+                box.prop(camera_item, "max_pan")
+                box.prop(camera_item, "max_tilt")
+            else:
+                box.label(text="No camera selected")
         
         box = layout.box()
         box.label(text="Nav Mesh:")

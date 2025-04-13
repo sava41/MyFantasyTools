@@ -26,7 +26,6 @@ import mftools
 import mfblender
 import serialize_level
 
-
 def set_properties(
     scene: bpy.types.Scene,
     resolution_percentage: int = 100,
