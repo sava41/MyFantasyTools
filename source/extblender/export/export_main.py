@@ -125,8 +125,10 @@ class MFT_OT_Export(Operator):
             #     (output_path_root / (input_filename + ".mflevel")).resolve(),
             # )
 
-            with open(export_path_root + "\\" + scene.mft_global_settings.navmesh_object.name + ".level", "wb") as file:
+            with open(export_path_root / (scene.mft_global_settings.navmesh_object.name + ".level"), "wb") as file:
                 file.write(level_data_buffer)
+
+            return {'FINISHED'}
 
 def register_properties():
     pass

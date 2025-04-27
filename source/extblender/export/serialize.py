@@ -70,19 +70,19 @@ def serialize_level(navmesh, views) -> bytearray:
     serialized_views = builder.EndVector()
 
     Level.StartNavmeshVertsVector(
-        builder, len(navmesh.object.vertices)
+        builder, len(navmesh.object.data.vertices)
     )
-    for vert in reversed(navmesh.object.vertices):
+    for vert in reversed(navmesh.object.data.vertices):
         Vec3.CreateVec3(builder, vert.co.x, vert.co.y, vert.co.z)
     navmesh_verts = builder.EndVector()
 
     Level.StartNavmeshTrisVector(
-        builder, len(navmesh.object.loop_triangles)
+        builder, len(navmesh.object.data.loop_triangles)
     )
 
-    for tri in reversed(navmesh.object.loop_triangles):
+    for tri in reversed(navmesh.object.data.loop_triangles):
         view_index = (
-            navmesh.object.attributes["Views"].data[tri.polygon_index].value
+            navmesh.object.data.attributes["Views"].data[tri.polygon_index].value
         )
         Triangle.CreateTriangle(
             builder,
@@ -94,7 +94,7 @@ def serialize_level(navmesh, views) -> bytearray:
         )
     navmesh_tris = builder.EndVector()
 
-    level_name = builder.CreateString(navmesh.name)
+    level_name = builder.CreateString(navmesh.object.name)
     level_data_path = builder.CreateString("./views/")
 
     Level.Start(builder)
