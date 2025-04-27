@@ -56,7 +56,7 @@ class MFT_PT_MainPanel(Panel):
         box.label(text="Export Path:")
         box.prop(scene.mft_global_settings, "export_directory", text="")
         
-        layout.operator("mft.render_scenes", icon='RENDER_STILL')
+        layout.operator("mft.export", icon='RENDER_STILL')
 
 def register_properties():    
     pass

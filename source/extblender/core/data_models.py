@@ -39,7 +39,6 @@ class MFT_Camera(PropertyGroup):
         subtype='ANGLE'
     )
 
-# --- Added Global Settings Class ---
 class MFT_GlobalSettings(PropertyGroup):
     """Group of global properties for the addon"""
     export_directory: StringProperty(
@@ -99,73 +98,6 @@ class MFT_OT_RemoveCamera(Operator):
         
         return {'FINISHED'}
 
-# Rendering operator
-class MFT_OT_RenderScenes(Operator):
-    """Render scenes from all enabled cameras"""
-    bl_idname = "mft.render_scenes"
-    bl_label = "Export"
-    bl_description = "Render images from all enabled cameras to the export path"
-    
-    def execute(self, context):
-        scene = context.scene
-        camera_props = scene.mft_cameras
-        export_path = scene.mft_export_path
-        
-        # Validate export path
-        if not export_path:
-            self.report({'ERROR'}, "Please specify an export path")
-            return {'CANCELLED'}
-        
-        if not os.path.exists(export_path):
-            try:
-                os.makedirs(export_path)
-            except:
-                self.report({'ERROR'}, f"Could not create directory: {export_path}")
-                return {'CANCELLED'}
-        
-        # Check for target mesh
-        if not scene.mft_target_mesh:
-            self.report({'ERROR'}, "Please specify a target mesh object")
-            return {'CANCELLED'}
-        
-        # Check for cameras
-        if len(camera_props) == 0:
-            self.report({'ERROR'}, "No cameras in the list")
-            return {'CANCELLED'}
-        
-        # Count enabled cameras
-        enabled_cameras = [item for item in camera_props if item.enabled and item.camera]
-        if len(enabled_cameras) == 0:
-            self.report({'ERROR'}, "No enabled cameras in the list")
-            return {'CANCELLED'}
-        
-        # Store original settings
-        original_camera = scene.camera
-        
-        # Do the rendering for each enabled camera
-        rendered_count = 0
-        for index, item in enumerate(camera_props):
-            if not item.enabled or not item.camera:
-                continue
-                
-            # Set camera as active
-            scene.camera = item.camera
-            
-            # Set output path
-            camera_name = item.camera.name
-            output_path = os.path.join(export_path, f"{camera_name}.png")
-            scene.render.filepath = output_path
-            
-            # Render
-            bpy.ops.render.render(write_still=True)
-            rendered_count += 1
-        
-        # Restore original camera
-        scene.camera = original_camera
-        
-        self.report({'INFO'}, f"Rendered {rendered_count} images to {export_path}")
-        return {'FINISHED'}
-
 def register_properties():
     bpy.types.Scene.mft_global_settings = PointerProperty(type=MFT_GlobalSettings)
     bpy.types.Scene.mft_cameras = CollectionProperty(type=MFT_Camera)
@@ -182,7 +114,6 @@ classes = (
     MFT_Camera,
     MFT_OT_AddCamera,
     MFT_OT_RemoveCamera,
-    MFT_OT_RenderScenes,
 )
 
 def register():

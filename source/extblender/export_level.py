@@ -24,7 +24,7 @@ sys.path.append(working_dir_path)
 
 import mftools
 import mfblender
-import serialize_level
+import source.extblender.export.serialize as serialize
 
 def set_properties(
     scene: bpy.types.Scene,
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     views = mfblender.create_view_list(scene, str(output_path_root.resolve()))
 
     # Serialize Level
-    serialize_level.process_navmesh(scene, views, str(output_path_final.resolve()))
+    serialize.process_navmesh(scene, views, str(output_path_final.resolve()))
 
     # Render Settings
     set_cycles_renderer(scene, num_samples)

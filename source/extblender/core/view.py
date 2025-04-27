@@ -86,11 +86,10 @@ class View:
         return self.main_camera.data["view_id"] < other.main_camera.data["view_id"]
 
 
-def create_view_list(scene, output_path) -> list:
+def create_view_list(cameras, output_path) -> list:
     views = list()
-    for ob in scene.objects:
-        if ob.type == "CAMERA":
-            views.append(View(ob, output_path))
+    for ob in cameras:
+        views.append(View(ob.camera, output_path))
 
     if len(views) == 0:
         print("Error: No cameras found")

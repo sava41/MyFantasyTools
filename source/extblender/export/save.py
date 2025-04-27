@@ -1,6 +1,5 @@
 import bpy
 
-
 def export_obj(mesh_object, output_path) -> bool:
     if mesh_object.type == "MESH":
         bpy.ops.object.select_all(action="DESELECT")
