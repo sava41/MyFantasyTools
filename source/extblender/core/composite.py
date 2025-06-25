@@ -1,81 +1,70 @@
 import bpy
 
 
-def setup():
-    # switch on nodes and get reference
-    bpy.context.scene.use_nodes = True
+class CompositeManager:
+    _tree = None
+    _layer_node = None
+    _output_node = None
+    _preview_node = None
+    
+    def __init__(self, scene):
+        
+        # switch on nodes and get reference
+        scene.use_nodes = True
 
-    bpy.context.scene.view_layers["ViewLayer"].use_pass_combined = True
-    bpy.context.scene.view_layers["ViewLayer"].use_pass_z = True
+        scene.view_layers["ViewLayer"].use_pass_combined = True
+        scene.view_layers["ViewLayer"].use_pass_z = True
 
-    tree = bpy.context.scene.node_tree
-    for node in tree.nodes:
-        tree.nodes.remove(node)
+        self._tree = scene.node_tree
+        for node in self._tree.nodes:
+            self._tree.nodes.remove(node)
 
+        # create input layer node
+        self._layer_node = self._tree.nodes.new(type="CompositorNodeRLayers")
 
-def set_main_composite_nodes(output_path):
-    setup()
+        # create output node
+        self._output_node = self._tree.nodes.new("CompositorNodeOutputFile")
+        self._output_node.format.file_format = "OPEN_EXR"
+        self._output_node.format.color_mode = "RGB"
+        self._output_node.format.exr_codec = "ZIP"
+        self._output_node.format.color_depth = "32"
 
-    tree = bpy.context.scene.node_tree
+        # create preview node
+        self._preview_node = self._tree.nodes.new("CompositorNodeOutputFile")
+        self._preview_node.format.file_format = "PNG"
+        self._preview_node.format.color_mode = "RGB"
 
-    # create input layer node
-    layer_node = tree.nodes.new(type="CompositorNodeRLayers")
-    layer_node.location = 0, 0
+        self._preview_node.file_slots.clear()
+        self._preview_node.file_slots.new("Preview#")
 
-    # create output node
-    output_node = tree.nodes.new("CompositorNodeOutputFile")
+    def set_main_output(self, output_path):
 
-    output_node.format.file_format = "OPEN_EXR"
-    output_node.format.color_mode = "RGB"
-    output_node.format.exr_codec = "ZIP"
-    output_node.format.color_depth = "32"
+        self._output_node.file_slots.clear()
+        self._output_node.file_slots.new("Color#")
+        self._output_node.file_slots.new("Depth#")
 
-    output_node.file_slots.clear()
-    output_node.file_slots.new("Color#")
-    output_node.file_slots.new("Depth#")
+        # link nodes
+        links = self._tree.links
+        links.clear()
+        links.new(self._layer_node.outputs.get("Image"), self._preview_node.inputs.get("Preview#"))
+        links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Color#"))
+        links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))
 
-    output_node.base_path = bpy.path.relpath(output_path)
+        rel_path = bpy.path.relpath(output_path)
+        self._output_node.base_path = rel_path
+        self._preview_node.base_path = rel_path
+    
+    def set_env_output(self, output_path):
 
-    # create preview node
-    preview_node = tree.nodes.new("CompositorNodeOutputFile")
+        self._output_node.file_slots.clear()
+        self._output_node.file_slots.new("Environment#")
 
-    preview_node.format.file_format = "PNG"
-    preview_node.format.color_mode = "RGB"
+        self._output_node.base_path = bpy.path.relpath(output_path)
 
-    preview_node.file_slots.clear()
-    preview_node.file_slots.new("Preview#")
+        # link nodes
+        links = self._tree.links
+        links.clear()
+        links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Environment#"))
 
-    preview_node.base_path = bpy.path.relpath(output_path)
-
-    # link nodes
-    links = tree.links
-    links.new(layer_node.outputs.get("Image"), preview_node.inputs.get("Preview#"))
-    links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Color#"))
-    links.new(layer_node.outputs.get("Depth"), output_node.inputs.get("Depth#"))
-
-
-def set_env_composite_nodes(output_path):
-    setup()
-
-    tree = bpy.context.scene.node_tree
-
-    # create input layer node
-    layer_node = tree.nodes.new(type="CompositorNodeRLayers")
-    layer_node.location = 0, 0
-
-    # create output node
-    output_node = tree.nodes.new("CompositorNodeOutputFile")
-
-    output_node.format.file_format = "OPEN_EXR"
-    output_node.format.color_mode = "RGB"
-    output_node.format.exr_codec = "ZIP"
-    output_node.format.color_depth = "32"
-
-    output_node.file_slots.clear()
-    output_node.file_slots.new("Environment#")
-
-    output_node.base_path = bpy.path.relpath(output_path)
-
-    # link nodes
-    links = tree.links
-    links.new(layer_node.outputs.get("Image"), output_node.inputs.get("Environment#"))
+        rel_path = bpy.path.relpath(output_path)
+        self._output_node.base_path = rel_path

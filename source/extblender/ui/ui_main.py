@@ -55,8 +55,20 @@ class MFT_PT_MainPanel(Panel):
         box = layout.box()
         box.label(text="Export Path:")
         box.prop(scene.mft_global_settings, "export_directory", text="")
+
+        box = layout.box()
+        col = layout.column(align=True)
+
+        if scene.mft_global_settings.is_rendering and scene.mft_global_settings.total_views > 0:
+            progress_ratio = (min(scene.mft_global_settings.current_view, scene.mft_global_settings.total_views - 1)) / scene.mft_global_settings.total_views
+            progress_text = "Rendering..."
+            
+            col.progress(text=progress_text, factor = progress_ratio)
+            
+            col.operator("mft.cancel", icon='CANCEL')
+        else:
+            col.operator("mft.export", icon='RENDER_STILL')
         
-        layout.operator("mft.export", icon='RENDER_STILL')
 
 def register_properties():    
     pass

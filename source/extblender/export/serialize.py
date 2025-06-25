@@ -16,7 +16,7 @@ def serialize_level(navmesh, views) -> bytearray:
         return None
 
     for i, view in enumerate(views):
-        view.adjacent_views = navmesh.find_adjacent_views(i)
+        view._adjacent_views = navmesh.find_adjacent_views(i)
         convex_hull = navmesh.find_convex_hull_area(i)
         view.set_env_probe_location(convex_hull)
 
@@ -25,19 +25,19 @@ def serialize_level(navmesh, views) -> bytearray:
     serialized_views = list()
     for view in views:
 
-        name = builder.CreateString(view.main_camera.name)
+        name = builder.CreateString(view._main_camera.name)
 
-        View.StartAdjacentViewsVector(builder, len(view.adjacent_views))
-        for adj_view in view.adjacent_views:
+        View.StartAdjacentViewsVector(builder, len(view._adjacent_views))
+        for adj_view in view._adjacent_views:
             builder.PrependUint16(adj_view)
         adjacent_views = builder.EndVector()
         View.Start(builder)
         View.AddName(builder, name)
-        View.AddAspect(builder, float(view.res_x) / float(view.res_y))
-        View.AddFov(builder, view.fov)
-        View.AddResX(builder, view.res_x)
-        View.AddResY(builder, view.res_y)
-        matrix_world = view.main_camera.matrix_world
+        View.AddAspect(builder, float(view._res_x) / float(view._res_y))
+        View.AddFov(builder, view._fov)
+        View.AddResX(builder, view._res_x)
+        View.AddResY(builder, view._res_y)
+        matrix_world = view._main_camera.matrix_world
         View.AddWorldTransform(
             builder,
             Mat4.CreateMat4(

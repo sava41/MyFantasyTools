@@ -54,6 +54,11 @@ class MFT_GlobalSettings(PropertyGroup):
         poll=lambda self, obj: obj.type == 'MESH'
     )
 
+    current_view: IntProperty(default=0)
+    total_views: IntProperty(default=0)
+    is_rendering: BoolProperty(default=False)
+    cancel_rendering: BoolProperty(default=False)
+
 class MFT_OT_AddCamera(Operator):
     """Add a camera to the list"""
     bl_idname = "mft.add_camera"

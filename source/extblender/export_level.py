@@ -114,11 +114,11 @@ if __name__ == "__main__":
     # Render
     for view in views:
         view.set_active(scene)
-        mfblender.set_main_composite_nodes(view.render_output_path)
+        mfblender.set_main_composite_nodes(view._render_output_path)
         bpy.ops.render.render(scene=scene.name)
 
         view.set_env_probe_active(scene)
-        mfblender.set_env_composite_nodes(view.render_output_path)
+        mfblender.set_env_composite_nodes(view._render_output_path)
         bpy.ops.render.render(scene=scene.name)
 
     bpy.ops.wm.quit_blender()
@@ -128,13 +128,13 @@ if __name__ == "__main__":
 
     for view in views:
         if not Path(view.render_output_path).exists():
-            print("Render does not exist: " + view.render_output_path)
+            print("Render does not exist: " + view._render_output_path)
             continue
-        for filename in os.listdir(view.render_output_path):
-            filepath = Path(view.render_output_path) / filename
+        for filename in os.listdir(view._render_output_path):
+            filepath = Path(view._render_output_path) / filename
             if filepath.is_file() and ".exr" in filename:
                 output_file = (
-                    view.main_camera.name + "_" + filename.replace("0.exr", ".jxl")
+                    view._main_camera.name + "_" + filename.replace("0.exr", ".jxl")
                 )
                 output_file_path = output_path_final / "views" / output_file
 
