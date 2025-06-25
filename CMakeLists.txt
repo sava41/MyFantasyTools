@@ -18,5 +18,5 @@ if(NOT CMAKE_INSTALL_PREFIX)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 endif()
 
-add_subdirectory(source/cpp)
-add_subdirectory(source/extblender)
+add_subdirectory(source/core)
+add_subdirectory(source/blender_plugin)
