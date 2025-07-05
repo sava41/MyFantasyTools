@@ -3,10 +3,13 @@ from bpy.types import Operator
 
 import os
 from pathlib import Path
+import numpy as np
+import shutil
 
 from . import render
 from . import save
 from . import serialize
+from .. import mftools
 
 from ..core.view import *
 from ..core.composite import *
@@ -23,19 +26,6 @@ class MFT_OT_Export(Operator):
     _render_scene = None
     _views = []
     _comp_manager = None
-    
-    
-    class RenderState(Enum):
-        Camera = 1
-        Probe = 2
-    
-    _render_stage = RenderState.Camera
-
-    def __init__(self):
-        pass
-
-    def __del__(self):
-        pass
 
     def modal(self, context, event):
         if event.type == 'TIMER':
@@ -58,6 +48,47 @@ class MFT_OT_Export(Operator):
 
                 if self._og_scene:
                     self._og_scene = None
+
+                for area in bpy.context.screen.areas:
+                    if area.type == 'IMAGE_EDITOR':
+                        area.type = 'VIEW_3D'
+
+                output_path_root = Path(bpy.path.abspath(context.scene.mft_global_settings.export_directory))
+                output_path_final = output_path_root / "data"
+
+                os.makedirs(output_path_final / "views", exist_ok=True)
+
+                for view in self._views:
+                    for filename in os.listdir(view._render_output_path):
+                        filepath = Path(view._render_output_path) / filename
+                        if filepath.is_file() and ".exr" in filename:
+                            output_file = view._main_camera.name + "_" + filename.replace("1.exr", ".jxl")
+                            output_file_path = output_path_final / "views" / output_file
+
+                            print(f"Processing file: {output_file}")
+
+                            # TODO: exr_to_jxl may hit jxl assert if compiled in debug
+                            mftools.exr_to_jxl(
+                               str(filepath.resolve()),
+                               str(output_file_path.resolve()),
+                            )
+                
+                # Zip data
+                shutil.make_archive(
+                    str((output_path_root / "mft_level_data").resolve()),
+                    format="zip",
+                    root_dir=str(output_path_final.resolve()),
+                )
+
+                level_name = bpy.path.display_name_from_filepath(bpy.data.filepath)
+
+                if not level_name:
+                    level_name = "new_level"
+
+                os.rename(
+                    (output_path_root / "mft_level_data.zip").resolve(),
+                    (output_path_root / (level_name + ".mflevel")).resolve(),
+                )
                 
                 return {'FINISHED'}
 
@@ -84,11 +115,10 @@ class MFT_OT_Export(Operator):
 
     def execute(self, context):
         scene = context.scene
-        export_path_root = Path(bpy.path.abspath(scene.mft_global_settings.export_directory));
+        export_path_root = Path(bpy.path.abspath(scene.mft_global_settings.export_directory))
         export_path_final = export_path_root / "data"
 
-        if not os.path.exists(export_path_root):
-            os.makedirs(export_path_root)
+        os.makedirs(export_path_final, exist_ok=True)
         
         cameras = scene.mft_cameras
 
@@ -123,7 +153,7 @@ class MFT_OT_Export(Operator):
         navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
 
         level_data_buffer = serialize.serialize_level(navmesh, self._views)
-        with open(export_path_root / (scene.mft_global_settings.navmesh_object.name + ".level"), "wb") as file:
+        with open(export_path_final / (scene.mft_global_settings.navmesh_object.name + ".level"), "wb") as file:
             file.write(level_data_buffer)
 
         # Create dummy scene for rendering
@@ -169,10 +199,8 @@ class MFT_OT_Export(Operator):
         self._render_scene.mft_global_settings.is_rendering = True
         self._render_scene.mft_global_settings.should_cancel = False
 
-        self._render_stage = self.RenderState.Camera
-
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, window=context.window)
+        self._timer = wm.event_timer_add(0.2, window=context.window)
         wm.modal_handler_add(self)
         
         self.report({'INFO'}, f"Starting render of {len(cameras)} views")
@@ -267,7 +295,3 @@ def unregister():
     unregister_properties()
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
-
-if __name__ == "__main__":
-    register()
-

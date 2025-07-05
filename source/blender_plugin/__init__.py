@@ -9,6 +9,7 @@ from . export import export_main
 from . import mftools
 
 def register():
+    importlib.reload(mftools)
     importlib.reload(data_models)
     importlib.reload(ui_main)
     importlib.reload(export_main)
