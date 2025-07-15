@@ -170,32 +170,7 @@ class MFT_OT_Export(Operator):
         self._comp_manager = CompositeManager(self._render_scene)
 
         # Override render settings
-        self._render_scene.render.filepath = "//tmp/render_temp"  # Change as needed
-
-        self._render_scene.render.image_settings.file_format = "OPEN_EXR"
-        self._render_scene.render.engine = "CYCLES"
-        self._render_scene.render.use_compositing = True
-        self._render_scene.render.use_motion_blur = False
-
-        self._render_scene.render.film_transparent = False
-        self._render_scene.view_layers[0].cycles.use_denoising = True
-
-        self._render_scene.cycles.use_adaptive_sampling = True
-        self._render_scene.cycles.samples = 512
-
-        self._render_scene.render.use_persistent_data = True
-
-        # Enable GPU acceleration
-        # Source - https://blender.stackexchange.com/a/196702
-        self._render_scene.cycles.device = "GPU"
-        context.preferences.addons["cycles"].preferences.get_devices()
-        
-        # Let Blender use all available devices, include GPU and CPU
-        for d in context.preferences.addons["cycles"].preferences.devices:
-            if d.type in ['METAL', 'OPTIX', 'OPENCL']:
-                context.preferences.addons["cycles"].preferences.compute_device_type = d.type
-                d["use"] = 1
-                break
+        render.set_renderer_params(context, self._render_scene)
 
         # Render
         self._render_scene.mft_global_settings.current_view = 0
