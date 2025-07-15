@@ -3,8 +3,6 @@ import bpy
 def set_renderer_params(context, scene):
     scene.render.filepath = "//tmp/render_temp"
 
-    print('lel')
-
     scene.render.image_settings.file_format = "OPEN_EXR"
     scene.render.engine = "CYCLES"
     scene.render.use_compositing = True
