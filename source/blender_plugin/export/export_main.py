@@ -3,13 +3,12 @@ from bpy.types import Operator
 
 import os
 from pathlib import Path
-import numpy as np
 import shutil
+import threading
 
 from . import render
 from . import save
 from . import serialize
-from .. import mftools
 
 from ..core.view import *
 from ..core.composite import *
@@ -25,7 +24,9 @@ class MFT_OT_Export(Operator):
     _og_scene = None
     _render_scene = None
     _views = []
+    _jxl_threads = []
     _comp_manager = None
+    _next_index = False
 
     def modal(self, context, event):
         if event.type == 'TIMER':
@@ -55,23 +56,9 @@ class MFT_OT_Export(Operator):
 
                 output_path_root = Path(bpy.path.abspath(context.scene.mft_global_settings.export_directory))
                 output_path_final = output_path_root / "data"
-
-                os.makedirs(output_path_final / "views", exist_ok=True)
-
-                for view in self._views:
-                    for filename in os.listdir(view._render_output_path):
-                        filepath = Path(view._render_output_path) / filename
-                        if filepath.is_file() and ".exr" in filename:
-                            output_file = view._main_camera.name + "_" + filename.replace("1.exr", ".jxl")
-                            output_file_path = output_path_final / "views" / output_file
-
-                            print(f"Processing file: {output_file}")
-
-                            # TODO: exr_to_jxl may hit jxl assert if compiled in debug
-                            mftools.exr_to_jxl(
-                               str(filepath.resolve()),
-                               str(output_file_path.resolve()),
-                            )
+                
+                for t in self._jxl_threads:
+                    t.join()
                 
                 # Zip data
                 shutil.make_archive(
@@ -93,6 +80,23 @@ class MFT_OT_Export(Operator):
                 return {'FINISHED'}
 
             if not bpy.app.is_job_running('RENDER'):
+                
+                if self._next_index:
+                    prev_view = self._views[context.scene.mft_global_settings.current_view]
+
+                    output_path_root = Path(bpy.path.abspath(context.scene.mft_global_settings.export_directory))
+                    output_path_final = output_path_root / "data" / "views"
+
+                    os.makedirs(output_path_final, exist_ok=True)
+
+                    t = threading.Thread(target=save.convert_all_exr_to_jxl, args=(prev_view._main_camera.name, prev_view._render_output_path, str(output_path_final.resolve())))
+                    t.start()
+
+                    self._jxl_threads.append(t)
+                    
+                    context.scene.mft_global_settings.current_view += 1
+                    self._next_index = False
+
                 index = context.scene.mft_global_settings.current_view
 
                 if index >= len(self._views):
@@ -106,10 +110,10 @@ class MFT_OT_Export(Operator):
                     return {'PASS_THROUGH'}
                 
                 view.set_next_camera_active(self._render_scene, self._comp_manager)
-                bpy.ops.render.render('INVOKE_DEFAULT', write_still=True, scene=self._render_scene.name)
+                bpy.ops.render.render('INVOKE_DEFAULT', write_still=False, scene=self._render_scene.name)
 
                 if view._current_render is View.RenderType.Complete:
-                    context.scene.mft_global_settings.current_view = index + 1
+                    self._next_index = True
 
         return {'PASS_THROUGH'}
 
@@ -117,8 +121,6 @@ class MFT_OT_Export(Operator):
         scene = context.scene
         export_path_root = Path(bpy.path.abspath(scene.mft_global_settings.export_directory))
         export_path_final = export_path_root / "data"
-
-        os.makedirs(export_path_final, exist_ok=True)
         
         cameras = scene.mft_cameras
 
@@ -151,6 +153,8 @@ class MFT_OT_Export(Operator):
 
         self._views = create_view_list(enabled_cameras, str(export_path_root.resolve()))
         navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
+
+        os.makedirs(export_path_final, exist_ok=True)
 
         level_data_buffer = serialize.serialize_level(navmesh, self._views)
         with open(export_path_final / (scene.mft_global_settings.navmesh_object.name + ".level"), "wb") as file:
@@ -206,59 +210,6 @@ class MFT_OT_Export(Operator):
         self.report({'INFO'}, f"Starting render of {len(cameras)} views")
         
         return {'RUNNING_MODAL'}
-
-        # if not (output_path_final / "views").exists():
-        #     os.makedirs(output_path_final / "views")
-
-        # for view in views:
-        #     if not Path(view.render_output_path).exists():
-        #         print("Render does not exist: " + view._render_output_path)
-        #         continue
-        #     for filename in os.listdir(view._render_output_path):
-        #         filepath = Path(view._render_output_path) / filename
-        #         if filepath.is_file() and ".exr" in filename:
-        #             output_file = (
-        #                 view._main_camera.name + "_" + filename.replace("0.exr", ".jxl")
-        #             )
-        #             output_file_path = output_path_final / "views" / output_file
-
-        #             print(f"Processing file: {output_file}")
-
-        #             image_flags = cv2.IMREAD_ANYDEPTH
-        #             channels = 3
-
-        #             if "Color" in filename:
-        #                 image_flags = image_flags | cv2.IMREAD_ANYCOLOR
-        #             if "Depth" in filename:
-        #                 image_flags = image_flags | cv2.IMREAD_GRAYSCALE
-        #                 channels = 1
-        #             if "Environment" in filename:
-        #                 image_flags = image_flags | cv2.IMREAD_ANYCOLOR
-
-        #             img = cv2.imread(str(filepath.resolve()), image_flags)
-
-        #             # TODO: save_jxl may hit jxl assert if compiled in debug
-        #             mftools.save_jxl(
-        #                 img.shape[1],
-        #                 img.shape[0],
-        #                 channels,
-        #                 img,
-        #                 str(output_file_path.resolve()),
-        #             )
-
-        # # Zip data
-        # shutil.make_archive(
-        #     str((output_path_root / "mft_level_data").resolve()),
-        #     format="zip",
-        #     root_dir=str(output_path_final.resolve()),
-        # )
-
-        # os.rename(
-        #     (output_path_root / "mft_level_data.zip").resolve(),
-        #     (output_path_root / (input_filename + ".mflevel")).resolve(),
-        # )
-
-        return {'FINISHED'}
     
     def cancel(self, context):        
         context.scene.mft_global_settings.is_rendering = False

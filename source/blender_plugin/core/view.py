@@ -45,8 +45,9 @@ class View:
         self._env_camera_obj.data.panorama_type = "EQUIRECTANGULAR"
     
     def __del__(self):
-        for collection in self._env_camera_obj.users_collection:
-            collection.objects.unlink(self._env_camera_obj)
+        #TODO: figure out if we need to remove this from the collection?
+        #for collection in self._env_camera_obj.users_collection:
+        #    collection.objects.unlink(self._env_camera_obj)
         bpy.data.cameras.remove(self._env_camera)
 
     def set_next_camera_active(self, scene, composite_manager):

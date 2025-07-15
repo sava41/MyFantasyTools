@@ -129,13 +129,13 @@ namespace mft
             save_jxl
         )pbdoc";
 
-        m.def( "save_jxl", &save_jxl, R"pbdoc(
+        m.def( "save_jxl", &save_jxl, pybind11::call_guard<pybind11::gil_scoped_release>(), R"pbdoc(
             Save np array to jxl
 
             saves a an np array as a jxl image
         )pbdoc" );
 
-        m.def( "exr_to_jxl", &exr_to_jxl, R"pbdoc(
+        m.def( "exr_to_jxl", &exr_to_jxl, pybind11::call_guard<pybind11::gil_scoped_release>(), R"pbdoc(
             Convert EXR to JXL
 
             Converts an OpenEXR file to JPEG XL format
