@@ -4,7 +4,7 @@
 #include "io.h"
 #include "jxl.h"
 #include "level_generated.h"
-#include "math.h"
+#include "mft_math.h"
 #include "view_data.h"
 
 #include <fstream>

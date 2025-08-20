@@ -2,6 +2,8 @@
 
 #include "level_generated.h"
 
+#include <cmath>
+
 namespace mft
 {
     inline float length( const data::Vec3& a )

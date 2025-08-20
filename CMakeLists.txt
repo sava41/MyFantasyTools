@@ -20,3 +20,4 @@ endif()
 
 add_subdirectory(source/core)
 add_subdirectory(source/blender_plugin)
+add_subdirectory(source/godot_plugin)
