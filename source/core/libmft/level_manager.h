@@ -1,9 +1,10 @@
 
 #pragma once
 
+#include "level.h"
+#include "view_data.h"
+
 #include <array>
-#include <filesystem>
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -13,30 +14,41 @@ namespace mft
 
     class ViewData;
 
-    using ViewDataFactory = std::function<std::unique_ptr<ViewData>( const std::string&, const std::filesystem::path&, unsigned int )>;
-
-    class LevelManager
+    template <typename ViewDataImpl>
+    class ViewLevelManager : Level
     {
       public:
-        LevelManager( ViewDataFactory factory );
-        ~LevelManager();
+        static_assert( std::is_base_of_v<ViewData, ViewDataImpl>, "ViewDataImpl must inherit from ViewData" );
 
-        bool load_level( const std::string& path );
-        int get_views_length() const;
+        ViewLevelManager()  = default;
+        ~ViewLevelManager() = default;
 
-        ViewData* get_view( int viewIndex );
+        bool load_data( const std::string& path )
+        {
+            bool ret = true;
 
-        std::vector<int> get_adjacent_views( int viewIndex ) const;
+            ret = ret && Level::load_level( path );
 
-        int get_view_id_from_position( float x, float y, float z ) const;
+            ret = ret && Level::load_views( m_views );
 
-        int get_navmesh_tris_length();
-        std::array<float, 9> get_navmesh_tri_verts( int triIndex );
+            return ret;
+        }
+
+        int get_num_views() const
+        {
+            return m_views.size();
+        }
+
+        ViewDataImpl& get_view( int viewIndex )
+        {
+            if( 0 > viewIndex || viewIndex >= get_views_length() )
+                return nullptr;
+
+            return m_views[viewIndex];
+        }
 
       private:
-        std::vector<char> m_dataBuffer;
-        std::vector<std::unique_ptr<ViewData>> m_views;
-        ViewDataFactory m_viewFactory;
+        std::vector<ViewDataImpl> m_views;
     };
 
 } // namespace mft

@@ -37,7 +37,7 @@ namespace mft
             bool res                     = jxl::decode_oneshot( compressed,
                                                                 [this, &image]( int sizex, int sizey, int channels, size_t bufferSize ) -> void*
                                                                 {
-                                                void* bufferPtr = create_image_buffer( sizex, sizey, channels, bufferSize, image.first );
+                                                void* bufferPtr = create_image_buffer( sizex, sizey, channels, image.first );
 
                                                 m_imageBuffers.insert( { image.first, bufferPtr } );
 

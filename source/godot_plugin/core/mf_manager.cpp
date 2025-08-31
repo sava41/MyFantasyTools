@@ -14,8 +14,8 @@
 MFManager::MFManager()
     : godot::Object()
 {
-    m_currentView.viewID = -1;
-    m_static_inst        = this;
+    m_currentViewId = -1;
+    m_static_inst   = this;
 }
 
 MFManager::~MFManager()
@@ -53,37 +53,14 @@ int MFManager::get_views_length()
     return m_manager.get_views_length();
 }
 
-MFViewData MFManager::get_view_data( int viewId )
+const MFViewData& MFManager::get_view_data( int viewId )
 {
-    if( viewId < 0 || viewId >= m_manager.get_views_length() || viewId == m_currentView.viewID )
+    if( viewId < 0 || viewId >= m_manager.get_views_length() || viewId == m_currentViewId )
     {
-        return m_currentView;
+        return m_manager.get_view( m_currentViewId );
     }
 
-    MFViewData view;
-
-    view.viewID = viewId;
-
-    view.name = godot::String( m_manager.get_view_name( viewId ).c_str() );
-
-    view.fov = m_manager.get_view_fov( viewId );
-
-    view.sizeX = m_manager.get_view_width( viewId );
-    view.sizeY = m_manager.get_view_height( viewId );
-
-    view.colorBuffer = m_manager.get_view_color_buffer( viewId );
-    view.depthBuffer = m_manager.get_view_depth_buffer( viewId );
-    view.envBuffer   = m_manager.get_view_env_buffer( viewId );
-
-    // Transform comes in as 1x16 vector representing 4x4 matrix
-    // Godot transform constructor takes basis vectors first and offset vector last
-    const auto mat4 = m_manager.get_view_tranform( viewId );
-    view.transform  = godot::Transform3D( mat4[0], mat4[1], mat4[2], mat4[4], mat4[5], mat4[6], mat4[8], mat4[9], mat4[10], mat4[3], mat4[7], mat4[11] );
-
-    // Input tranform is z-up we need to convert to y-up for godot
-    view.transform.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );
-
-    return view;
+    return m_manager.get_view( viewId );
 }
 
 int MFManager::get_closest_view_Id( const godot::Vector3& point )
@@ -116,14 +93,14 @@ godot::PackedVector3Array MFManager::get_navmesh()
 
 bool MFManager::set_current_view( int viewId )
 {
-    if( viewId < 0 || viewId >= m_manager.get_views_length() || viewId == m_currentView.viewID )
+    if( viewId < 0 || viewId >= m_manager.get_views_length() || viewId == m_currentViewId )
     {
         return false;
     }
 
-    m_currentView = get_view_data( viewId );
+    m_currentViewId = viewId;
 
-    emit_signal( "current_view_changed", m_currentView.viewID );
+    emit_signal( "current_view_changed", m_currentViewId );
 
     return true;
 }

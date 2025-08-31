@@ -16,12 +16,13 @@ namespace mft
     class ViewData
     {
       public:
-        enum ImageType
+        enum ImageType : uint32_t
         {
             Color       = 1 << 0,
             Depth       = 1 << 1,
             Environment = 1 << 2
         };
+
         const std::unordered_map<ImageType, std::string> ImageTypeStrings{ { Color, "Color" }, { Depth, "Depth" }, { Environment, "Environment" } };
 
         ViewData( const std::string& name, const std::filesystem::path& dataDir, unsigned int imageTypesFlags );
@@ -42,20 +43,24 @@ namespace mft
 
         // Create an image container and return the pointer to the data buffer
         // ImageType is used to keep track which type of image buffer was created
-        virtual void* create_image_buffer( int sizex, int sizey, int channels, size_t bufferSize, const ImageType& type ) = 0;
+        virtual void* create_image_buffer( int sizex, int sizey, int channels, const ImageType& type ) = 0;
 
         // Destroy and release memory for all the image containers;
         virtual void destroy_image_buffers() = 0;
 
-      private:
+      public:
         std::string m_name;
-
-        std::map<ImageType, std::filesystem::path> m_imagePaths;
-        std::map<ImageType, void*> m_imageBuffers;
-
-        std::atomic<unsigned int> m_imagesLoaded;
+        int m_id;
+        int m_size_x;
+        int m_size_y;
 
         unsigned int m_imageTypeFlags;
+
+      private:
+        std::unordered_map<ImageType, std::filesystem::path> m_imagePaths;
+        std::unordered_map<ImageType, void*> m_imageBuffers;
+
+        std::atomic<unsigned int> m_imagesLoaded;
     };
 
 } // namespace mft

@@ -58,7 +58,7 @@ int main( int argc, char* argv[] )
         return 1;
     }
 
-    mft::LevelManager manager( createViewDataSimple );
+    mft::ViewLevelManager manager( createViewDataSimple );
     if( !manager.load_level( argv[1] ) )
     {
         return 1;
