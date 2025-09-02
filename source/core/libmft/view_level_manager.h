@@ -5,6 +5,7 @@
 #include "view_data.h"
 
 #include <array>
+#include <cassert>
 #include <memory>
 #include <string>
 #include <vector>
@@ -15,7 +16,7 @@ namespace mft
     class ViewData;
 
     template <typename ViewDataImpl>
-    class ViewLevelManager : Level
+    class ViewLevelManager : public Level
     {
       public:
         static_assert( std::is_base_of_v<ViewData, ViewDataImpl>, "ViewDataImpl must inherit from ViewData" );
@@ -36,7 +37,7 @@ namespace mft
                 m_views.push_back( std::make_unique<ViewDataImpl>() );
             }
 
-            ret = ret && Level::load_views( m_views );
+            ret = ret && Level::load_views( reinterpret_cast<std::vector<std::unique_ptr<ViewData>>&>( m_views ) );
 
             return ret;
         }
@@ -46,10 +47,9 @@ namespace mft
             return m_views.size();
         }
 
-        ViewDataImpl& get_view( int viewIndex )
+        std::unique_ptr<ViewDataImpl>& get_view( int viewIndex )
         {
-            if( 0 > viewIndex || viewIndex >= get_views_length() )
-                return nullptr;
+            assert( viewIndex >= 0 && viewIndex < get_num_views() );
 
             return m_views[viewIndex];
         }

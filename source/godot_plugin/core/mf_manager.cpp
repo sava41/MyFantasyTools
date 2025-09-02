@@ -32,7 +32,7 @@ bool MFManager::load( const godot::String& path )
 
     const godot::String fullPath = godot::ProjectSettings::get_singleton()->globalize_path( path );
 
-    if( !m_manager.load_level( fullPath.utf8().get_data() ) )
+    if( !m_manager.load_data( fullPath.utf8().get_data() ) )
     {
         godot::UtilityFunctions::print( "MF manager failed to load " + fullPath );
         return false;
@@ -48,14 +48,14 @@ godot::String MFManager::get_current_level()
     return m_currentLevel;
 }
 
-int MFManager::get_views_length()
+int MFManager::get_num_views()
 {
-    return m_manager.get_views_length();
+    return m_manager.get_num_views();
 }
 
-const MFViewData& MFManager::get_view_data( int viewId )
+const std::unique_ptr<MFViewData>& MFManager::get_view_data( int viewId )
 {
-    if( viewId < 0 || viewId >= m_manager.get_views_length() || viewId == m_currentViewId )
+    if( viewId < 0 || viewId >= m_manager.get_num_views() || viewId == m_currentViewId )
     {
         return m_manager.get_view( m_currentViewId );
     }
@@ -74,7 +74,7 @@ int MFManager::get_closest_view_Id( const godot::Vector3& point )
 godot::PackedVector3Array MFManager::get_navmesh()
 {
     godot::PackedVector3Array tris;
-    tris.resize( m_manager.get_navmesh_tris_length() * 3 );
+    tris.resize( m_manager.get_navmesh_num_tris() * 3 );
 
     for( int i = 0; i < tris.size(); i += 3 )
     {
@@ -93,7 +93,7 @@ godot::PackedVector3Array MFManager::get_navmesh()
 
 bool MFManager::set_current_view( int viewId )
 {
-    if( viewId < 0 || viewId >= m_manager.get_views_length() || viewId == m_currentViewId )
+    if( viewId < 0 || viewId >= m_manager.get_num_views() || viewId == m_currentViewId )
     {
         return false;
     }

@@ -59,7 +59,7 @@ namespace mft
     {
         const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
 
-        assert( view_index < 0 || view_index >= level->views()->size() );
+        assert( view_index >= 0 && view_index < level->views()->size() );
 
         const auto* adjacent_views = level->views()->Get( view_index )->adjacent_views();
 
@@ -113,7 +113,7 @@ namespace mft
     {
         const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
 
-        assert( tri_index < 0 || tri_index >= level->navmesh_tris()->size() );
+        assert( tri_index >= 0 && tri_index < level->navmesh_tris()->size() );
 
         auto triangle = level->navmesh_tris()->Get( tri_index );
         auto verts    = level->navmesh_verts();

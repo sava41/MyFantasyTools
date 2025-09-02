@@ -3,7 +3,7 @@
 #include <godot_cpp/classes/image.hpp>
 #include <view_data.h>
 
-class MFViewData : mft::ViewData
+class MFViewData : public mft::ViewData
 {
   public:
     virtual bool load_camera_data( const std::array<float, MAT4_SIZE>& transform, int sizex, int sizey, float fov ) override;

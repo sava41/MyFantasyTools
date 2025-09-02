@@ -26,9 +26,9 @@ class MFManager : public godot::Object
     bool load( const godot::String& path );
 
     godot::String get_current_level();
-    int get_views_length();
+    int get_num_views();
     int get_closest_view_Id( const godot::Vector3& point );
-    const MFViewData& get_view_data( int viewId );
+    const std::unique_ptr<MFViewData>& get_view_data( int viewId );
     godot::PackedVector3Array get_navmesh();
 
     bool set_current_view( int viewId );

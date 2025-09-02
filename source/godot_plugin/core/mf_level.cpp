@@ -121,20 +121,20 @@ void MFLevel::setup_cameras()
         }
         m_editorCameras.clear();
 
-        for( int i = 0; i < MFManager::get()->get_views_length(); ++i )
+        for( int i = 0; i < MFManager::get()->get_num_views(); ++i )
         {
-            const MFViewData& view_data = MFManager::get()->get_view_data( i );
+            const std::unique_ptr<MFViewData>& view_data = MFManager::get()->get_view_data( i );
 
             godot::Camera3D* camera = memnew( godot::Camera3D() );
-            camera->set_name( godot::String( view_data.m_name.c_str() ) );
-            camera->set_transform( view_data.m_transform );
+            camera->set_name( godot::String( view_data->m_name.c_str() ) );
+            camera->set_transform( view_data->m_transform );
 
             add_child( camera );
             camera->set_owner( this );
 
             m_editorCameras.push_back( camera );
 
-            godot::UtilityFunctions::print( "made camera ", view_data.m_name.c_str() );
+            godot::UtilityFunctions::print( "made camera ", view_data->m_name.c_str() );
         }
     }
 }
@@ -165,18 +165,18 @@ bool MFLevel::set_view( int viewId )
         return false;
     }
 
-    const MFViewData& view_data = MFManager::get()->get_view_data( viewId );
+    const std::unique_ptr<MFViewData>& view_data = MFManager::get()->get_view_data( viewId );
 
-    m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_data.m_colorBuffer ) );
-    m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_data.m_depthBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_data->m_colorBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_data->m_depthBuffer ) );
 
-    m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_data.m_envBuffer ) );
+    m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_data->m_envBuffer ) );
 
     m_gameCamera->set_current( true );
-    m_gameCamera->set_transform( view_data.m_transform );
-    m_gameCamera->set_fov( view_data.m_fov );
+    m_gameCamera->set_transform( view_data->m_transform );
+    m_gameCamera->set_fov( view_data->m_fov );
 
-    godot::UtilityFunctions::print( "set camera: ", godot::String( view_data.m_name.c_str() ) );
+    godot::UtilityFunctions::print( "set camera: ", godot::String( view_data->m_name.c_str() ) );
 
     m_minViewDurationtimer->start( m_minViewDuration );
 
