@@ -29,6 +29,13 @@ namespace mft
 
             ret = ret && Level::load_level( path );
 
+            m_views.clear();
+            m_views.reserve( Level::get_num_views() );
+            for( size_t i = 0; i < Level::get_num_views(); ++i )
+            {
+                m_views.push_back( std::make_unique<ViewDataImpl>() );
+            }
+
             ret = ret && Level::load_views( m_views );
 
             return ret;
@@ -48,7 +55,7 @@ namespace mft
         }
 
       private:
-        std::vector<ViewDataImpl> m_views;
+        std::vector<std::unique_ptr<ViewDataImpl>> m_views;
     };
 
 } // namespace mft

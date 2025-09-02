@@ -6,7 +6,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/templates/vector.hpp>
-#include <level_manager.h>
+#include <view_level_manager.h>
 
 class MFManager : public godot::Object
 {

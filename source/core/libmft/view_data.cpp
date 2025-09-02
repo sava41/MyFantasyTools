@@ -7,18 +7,10 @@
 namespace mft
 {
 
-    ViewData::ViewData( const std::string& name, const std::filesystem::path& dataDir, unsigned int imageTypesFlags )
-        : m_name( name )
-        , m_imageTypeFlags( imageTypesFlags )
+    ViewData::ViewData()
+        : m_is_init( false )
+        , m_images_loaded( false )
     {
-        for( const auto& type : ImageTypeStrings )
-        {
-            unsigned int typeInt = static_cast<unsigned int>( type.first );
-            if( typeInt & imageTypesFlags )
-            {
-                m_imagePaths.insert( { type.first, dataDir / std::filesystem::path( name + "_" + type.second + ".jxl" ) } );
-            }
-        }
     }
 
     ViewData::~ViewData()
@@ -26,29 +18,46 @@ namespace mft
         unload_image_data();
     }
 
+    void ViewData::init( const std::string& name, const std::filesystem::path& data_dir, unsigned int image_type_flags )
+    {
+        m_name             = name;
+        m_image_type_flags = image_type_flags;
+
+        for( const auto& type : ImageTypeStrings )
+        {
+            unsigned int type_int = static_cast<unsigned int>( type.first );
+            if( type_int & image_type_flags )
+            {
+                m_image_paths.insert( { type.first, data_dir / std::filesystem::path( name + "_" + type.second + ".jxl" ) } );
+            }
+        }
+
+        m_is_init = true;
+    }
+
     bool ViewData::load_image_data()
     {
-        if( m_imagesLoaded )
+        if( m_images_loaded || !m_is_init )
             return false;
 
-        for( auto& image : m_imagePaths )
+        for( auto& image : m_image_paths )
         {
             std::vector<char> compressed = read_binary( image.second );
             bool res                     = jxl::decode_oneshot( compressed,
                                                                 [this, &image]( int sizex, int sizey, int channels, size_t bufferSize ) -> void*
                                                                 {
-                                                void* bufferPtr = create_image_buffer( sizex, sizey, channels, image.first );
+                                                void* buffer_ptr = create_image_buffer( sizex, sizey, channels, image.first );
 
-                                                m_imageBuffers.insert( { image.first, bufferPtr } );
+                                                m_image_buffers.insert( { image.first, buffer_ptr } );
 
-                                                return bufferPtr;
+                                                return buffer_ptr;
                                             } );
             if( !res )
             {
                 unload_image_data();
                 return false;
             }
-            m_imagesLoaded = m_imagesLoaded | static_cast<unsigned int>( image.first );
+            m_images_loaded = m_images_loaded | static_cast<unsigned int>( image.first );
         }
 
         return true;
@@ -58,16 +67,16 @@ namespace mft
     {
         destroy_image_buffers();
 
-        m_imageBuffers.clear();
+        m_image_buffers.clear();
 
-        m_imagesLoaded = 0;
+        m_images_loaded = 0;
 
         return true;
     }
 
     bool ViewData::is_data_loaded() const
     {
-        return m_imagesLoaded == m_imageTypeFlags;
+        return m_images_loaded == m_image_type_flags;
     }
 
 } // namespace mft

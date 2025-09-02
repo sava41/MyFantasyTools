@@ -1,5 +1,5 @@
-#include "level_manager.h"
 #include "view_data.h"
+#include "view_level_manager.h"
 
 #include <stdio.h>
 
@@ -45,11 +45,6 @@ class ViewDataSimple : public mft::ViewData
     std::vector<char> m_env;
 };
 
-std::unique_ptr<mft::ViewData> createViewDataSimple( const std::string& name, const std::filesystem::path& dataDir, unsigned int imageTypesFlags )
-{
-    return std::make_unique<ViewDataSimple>( name, dataDir, imageTypesFlags );
-}
-
 int main( int argc, char* argv[] )
 {
     if( argc <= 1 )
@@ -58,14 +53,14 @@ int main( int argc, char* argv[] )
         return 1;
     }
 
-    mft::ViewLevelManager manager( createViewDataSimple );
+    mft::ViewLevelManager<ViewDataSimple> manager();
     if( !manager.load_level( argv[1] ) )
     {
         return 1;
     }
 
-    printf( "there are %d cameras in this scene\n", manager.get_views_length() );
-    printf( "there are %d triangles in the navmesh\n", manager.get_navmesh_tris_length() );
+    printf( "there are %d cameras in this scene\n", manager.get_num_views() );
+    printf( "there are %d triangles in the navmesh\n", manager.get_navmesh_num_tris() );
 
     printf( "fini" );
     return 0;

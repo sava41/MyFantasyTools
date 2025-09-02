@@ -18,24 +18,22 @@ namespace mft
             return false;
         }
 
-        const auto* level = data::GetLevel( reinterpret_cast<void*>( m_data_buffer.data() ) );
+        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
         m_data_file_path  = level_file_path.parent_path() / std::filesystem::path( level->data_path()->str() );
         printf( "Data path: %s\n", level->data_path()->c_str() );
 
         return true;
     }
 
-    bool Level::load_views( std::vector<ViewData>& views )
+    bool Level::load_views( std::vector<std::unique_ptr<ViewData>>& views )
     {
-        views.clear();
-
-        const auto* level = data::GetLevel( reinterpret_cast<void*>( m_data_buffer.data() ) );
+        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
 
         const auto* views_data = level->views();
 
-        views.reserve( views_data->size() );
+        assert( views_data->size() == views.size() );
 
-        for( int i = 0; i < views_data->size(); ++i )
+        for( int i = 0; i < views.size(); ++i )
         {
             const auto* const view_data = views_data->Get( i );
 
@@ -46,10 +44,10 @@ namespace mft
                   world_transform_ptr->m22(), world_transform_ptr->m23(), world_transform_ptr->m30(), world_transform_ptr->m31(), world_transform_ptr->m32(),
                   world_transform_ptr->m33() } );
 
-            views.emplace_back( view_data->name()->c_str(), m_data_file_path, ViewData::Color | ViewData::Depth | ViewData::Environment );
+            views.at( i )->init( view_data->name()->c_str(), m_data_file_path, ViewData::Color | ViewData::Depth | ViewData::Environment );
 
-            views.back().load_image_data();
-            views.back().load_camera_data( transform, view_data->res_x(), view_data->res_y(), view_data->fov() );
+            views.at( i )->load_image_data();
+            views.at( i )->load_camera_data( transform, view_data->res_x(), view_data->res_y(), view_data->fov() );
 
             printf( "loaded %s\n", view_data->name()->c_str() );
         }
@@ -95,7 +93,16 @@ namespace mft
         return id;
     }
 
-    int Level::get_navmesh_tris_length()
+    int Level::get_num_views() const
+    {
+        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
+
+        const auto* views_data = level->views();
+
+        return views_data->size();
+    }
+
+    int Level::get_navmesh_num_tris()
     {
         const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
 

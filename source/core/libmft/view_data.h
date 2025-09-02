@@ -25,7 +25,7 @@ namespace mft
 
         const std::unordered_map<ImageType, std::string> ImageTypeStrings{ { Color, "Color" }, { Depth, "Depth" }, { Environment, "Environment" } };
 
-        ViewData( const std::string& name, const std::filesystem::path& dataDir, unsigned int imageTypesFlags );
+        ViewData();
         ~ViewData();
 
         ViewData( const ViewData& )  = delete;
@@ -33,6 +33,8 @@ namespace mft
 
         ViewData& operator=( const ViewData& ) = delete;
         ViewData& operator=( ViewData&& )      = delete;
+
+        void init( const std::string& name, const std::filesystem::path& data_dir, unsigned int image_type_flags );
 
         bool is_data_loaded() const;
         bool load_image_data();
@@ -54,13 +56,14 @@ namespace mft
         int m_size_x;
         int m_size_y;
 
-        unsigned int m_imageTypeFlags;
+        unsigned int m_image_type_flags;
 
       private:
-        std::unordered_map<ImageType, std::filesystem::path> m_imagePaths;
-        std::unordered_map<ImageType, void*> m_imageBuffers;
+        std::unordered_map<ImageType, std::filesystem::path> m_image_paths;
+        std::unordered_map<ImageType, void*> m_image_buffers;
 
-        std::atomic<unsigned int> m_imagesLoaded;
+        std::atomic<unsigned int> m_is_init;
+        std::atomic<unsigned int> m_images_loaded;
     };
 
 } // namespace mft
