@@ -47,5 +47,6 @@ mft_blender_addon.zip
 build/
 output/
 mft_blender_addon/
+mft_godot_plugin/
 libraries/
 venv/
