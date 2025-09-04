@@ -1,0 +1,12 @@
+[configuration]
+entry_symbol = "mft_init"
+compatibility_minimum = 4.1
+
+[libraries]
+linux.debug.x86_64 = "debug/libmft_godot.so"
+macos.debug = "debug/libmft_godot.dylib"
+windows.debug.x86_64 = "debug/libmft_godot.dll"
+
+linux.release.x86_64 = "release/libmft_godot.so"
+macos.release = "release/libmft_godot.dylib"
+windows.release.x86_64 = "release/libmft_godot.dll"

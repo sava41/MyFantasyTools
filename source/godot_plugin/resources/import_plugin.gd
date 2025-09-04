@@ -16,8 +16,11 @@ func _get_save_extension():
 
 func _get_preset_count():
 	return 1
+
+func  _get_import_order():
+	return 0
 	
-func _get_priority ():
+func _get_priority():
 	return 1.0
 
 func _get_preset_name(preset_index):

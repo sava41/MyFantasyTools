@@ -6,6 +6,9 @@
 class MFViewData : public mft::ViewData
 {
   public:
+    MFViewData()          = default;
+    virtual ~MFViewData() = default;
+
     virtual bool load_camera_data( const std::array<float, MAT4_SIZE>& transform, int sizex, int sizey, float fov ) override;
 
     virtual void* create_image_buffer( int sizex, int sizey, int channels, const ImageType& type ) override;
