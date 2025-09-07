@@ -1,5 +1,6 @@
 #include "mf_viewdata.h"
 
+#include <cassert>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
 
@@ -22,8 +23,10 @@ bool MFViewData::load_camera_data( const std::array<float, MAT4_SIZE>& transform
     return true;
 }
 
-void* MFViewData::create_image_buffer( int sizex, int sizey, int channels, const ImageType& type )
+void* MFViewData::create_image_buffer( int sizex, int sizey, int channels, size_t buffer_size, const ImageType& type )
 {
+    assert( channels == 3 || channels == 1 );
+
     switch( type )
     {
     case ImageType::Color:
