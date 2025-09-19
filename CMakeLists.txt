@@ -14,9 +14,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
-if(NOT CMAKE_INSTALL_PREFIX)
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-endif()
 
 add_subdirectory(source/core)
 add_subdirectory(source/blender_plugin)

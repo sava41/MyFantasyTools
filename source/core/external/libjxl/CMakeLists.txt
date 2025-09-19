@@ -5,7 +5,7 @@ message("Configuring libjxl")
 FetchContent_Declare(
   libjxl
   GIT_REPOSITORY https://github.com/libjxl/libjxl.git
-  GIT_TAG v0.9.2
+  GIT_TAG v0.11.1
 )
 set(JPEGXL_STATIC true)
 
