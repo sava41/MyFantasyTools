@@ -16,7 +16,7 @@ Build project:
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=<type>
 cmake --build build --target mflib mftools mft_godot --config <type>
-cmake --install build --component mft
+cmake --install build --component mft --config <type>
 ```
 
 ## Usage
