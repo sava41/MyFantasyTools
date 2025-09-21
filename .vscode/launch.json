@@ -1,0 +1,18 @@
+{
+    "version": "0.1.0",
+    "configurations": [
+        {
+            "name": "mftest",
+            "type": "lldb-dap",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/mftest",
+            "args": [
+                "/Users/savanozin/Documents/Output/data/navmesh_main.level"
+            ],
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        }
+    ]
+}

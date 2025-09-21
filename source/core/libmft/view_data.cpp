@@ -44,9 +44,9 @@ namespace mft
         {
             std::vector<char> compressed = read_binary( image.second );
             bool res                     = jxl::decode_oneshot( compressed,
-                                                                [this, &image]( int sizex, int sizey, int channels, size_t bufferSize ) -> void*
+                                                                [this, &image]( int sizex, int sizey, int channels, size_t buffer_size ) -> void*
                                                                 {
-                                                void* buffer_ptr = create_image_buffer( sizex, sizey, channels, image.first );
+                                                void* buffer_ptr = create_image_buffer( sizex, sizey, channels, buffer_size, image.first );
 
                                                 m_image_buffers.insert( { image.first, buffer_ptr } );
 

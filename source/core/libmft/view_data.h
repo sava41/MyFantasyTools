@@ -45,7 +45,7 @@ namespace mft
 
         // Create an image container and return the pointer to the data buffer
         // ImageType is used to keep track which type of image buffer was created
-        virtual void* create_image_buffer( int sizex, int sizey, int channels, const ImageType& type ) = 0;
+        virtual void* create_image_buffer( int sizex, int sizey, int channels, size_t buffer_size, const ImageType& type ) = 0;
 
         // Destroy and release memory for all the image containers;
         virtual void destroy_image_buffers() = 0;
