@@ -34,16 +34,21 @@ class CompositeManager:
         self._output_node.file_slots.new("Color#")
 
         # add depth slot with BW color mode
-        depth_slot = self._output_node.file_slots.new("Depth#")
+        self._output_node.file_slots.new("Depth#")
+        depth_slot = self._output_node.file_slots.get("Depth#")
+        depth_slot.use_node_format = False
         depth_slot.format.file_format = "OPEN_EXR"
         depth_slot.format.color_mode = "BW"
         depth_slot.format.exr_codec = "ZIP"
         depth_slot.format.color_depth = "32"
 
         # add preview slot with PNG format
-        preview_slot = self._output_node.file_slots.new("Preview#")
+        self._output_node.file_slots.new("Preview#")
+        preview_slot = self._output_node.file_slots.get("Preview#")
+        preview_slot.use_node_format = False
         preview_slot.format.file_format = "PNG"
         preview_slot.format.color_mode = "RGB"
+        preview_slot.format.color_depth = "8"
 
         # link nodes
         links = self._tree.links
