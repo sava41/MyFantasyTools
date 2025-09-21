@@ -5,7 +5,6 @@ class CompositeManager:
     _tree = None
     _layer_node = None
     _output_node = None
-    _preview_node = None
     
     def __init__(self, scene):
         
@@ -29,30 +28,32 @@ class CompositeManager:
         self._output_node.format.exr_codec = "ZIP"
         self._output_node.format.color_depth = "32"
 
-        # create preview node
-        self._preview_node = self._tree.nodes.new("CompositorNodeOutputFile")
-        self._preview_node.format.file_format = "PNG"
-        self._preview_node.format.color_mode = "RGB"
-
-        self._preview_node.file_slots.clear()
-        self._preview_node.file_slots.new("Preview#")
-
     def set_main_output(self, output_path):
 
         self._output_node.file_slots.clear()
         self._output_node.file_slots.new("Color#")
-        self._output_node.file_slots.new("Depth#")
+
+        # add depth slot with BW color mode
+        depth_slot = self._output_node.file_slots.new("Depth#")
+        depth_slot.format.file_format = "OPEN_EXR"
+        depth_slot.format.color_mode = "BW"
+        depth_slot.format.exr_codec = "ZIP"
+        depth_slot.format.color_depth = "32"
+
+        # add preview slot with PNG format
+        preview_slot = self._output_node.file_slots.new("Preview#")
+        preview_slot.format.file_format = "PNG"
+        preview_slot.format.color_mode = "RGB"
 
         # link nodes
         links = self._tree.links
         links.clear()
-        links.new(self._layer_node.outputs.get("Image"), self._preview_node.inputs.get("Preview#"))
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Color#"))
         links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))
+        links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Preview#"))
 
         rel_path = bpy.path.relpath(output_path)
         self._output_node.base_path = rel_path
-        self._preview_node.base_path = rel_path
     
     def set_env_output(self, output_path):
 

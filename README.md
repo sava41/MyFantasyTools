@@ -10,14 +10,17 @@ This project is a pipeline for making pre-rendered background games in the style
 - Python 3.11
 - CMake 3.19 or later
 - C++ compiler
+- Ninja (optional but recomended)
 
 ## Building
 Build project:
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=<type>
-cmake --build build --target mflib mftools mft_godot --config <type>
-cmake --install build --component mft --config <type>
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=<type>
+cmake --build build --target mflib mftools mft_godot
+cmake --install build --component mft
 ```
+
+Note: If the build setup has issues finding python, try manually setting `Python_ROOT_DIR` and `Python3_ROOT_DIR`
 
 ## Usage
 
