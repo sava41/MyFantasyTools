@@ -40,6 +40,12 @@ table View {
   fov: float;
   res_x: uint16;
   res_y: uint16;
+  
+  max_pan: float;
+  min_pan: float;
+  max_tilt: float;
+  min_tilt: float;
+  
   adjacent_views: [uint16];
 }
 

@@ -4,18 +4,19 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
 
-bool MFViewData::load_camera_data( const std::array<float, MAT4_SIZE>& transform, int size_x, int size_y, float fov )
+bool MFViewData::load_camera_data( const mft::ViewData::CameraData& camera_data )
 {
 
-    m_fov = fov;
+    m_fov = camera_data.fov;
 
-    m_size_x = size_x;
-    m_size_y = size_y;
+    m_size_x = camera_data.size_x;
+    m_size_y = camera_data.size_y;
 
     // Transform comes in as 1x16 vector representing 4x4 matrix
     // Godot transform constructor takes basis vectors first and offset vector last
-    m_transform = godot::Transform3D( transform[0], transform[1], transform[2], transform[4], transform[5], transform[6], transform[8], transform[9],
-                                      transform[10], transform[3], transform[7], transform[11] );
+    m_transform = godot::Transform3D( camera_data.transform[0], camera_data.transform[1], camera_data.transform[2], camera_data.transform[4],
+                                      camera_data.transform[5], camera_data.transform[6], camera_data.transform[8], camera_data.transform[9],
+                                      camera_data.transform[10], camera_data.transform[3], camera_data.transform[7], camera_data.transform[11] );
 
     // Input tranform is z-up we need to convert to y-up for godot
     m_transform.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );

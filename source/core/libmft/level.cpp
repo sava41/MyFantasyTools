@@ -38,7 +38,7 @@ namespace mft
             const auto* const view_data = views_data->Get( i );
 
             const auto* world_transform_ptr = view_data->world_transform();
-            const std::array<float, MAT4_SIZE> transform(
+            std::array<float, MAT4_SIZE> transform(
                 { world_transform_ptr->m00(), world_transform_ptr->m01(), world_transform_ptr->m02(), world_transform_ptr->m03(), world_transform_ptr->m10(),
                   world_transform_ptr->m11(), world_transform_ptr->m12(), world_transform_ptr->m13(), world_transform_ptr->m20(), world_transform_ptr->m21(),
                   world_transform_ptr->m22(), world_transform_ptr->m23(), world_transform_ptr->m30(), world_transform_ptr->m31(), world_transform_ptr->m32(),
@@ -47,7 +47,8 @@ namespace mft
             views.at( i )->init( view_data->name()->c_str(), m_data_file_path, ViewData::Color | ViewData::Depth | ViewData::Environment );
 
             views.at( i )->load_image_data();
-            views.at( i )->load_camera_data( transform, view_data->res_x(), view_data->res_y(), view_data->fov() );
+            views.at( i )->load_camera_data( { transform, view_data->res_x(), view_data->res_y(), view_data->fov(), view_data->max_pan(), view_data->min_pan(),
+                                               view_data->max_tilt(), view_data->min_tilt() } );
 
             printf( "loaded %s\n", view_data->name()->c_str() );
         }

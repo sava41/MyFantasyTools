@@ -23,6 +23,18 @@ namespace mft
             Environment = 1 << 2
         };
 
+        struct CameraData
+        {
+            std::array<float, MAT4_SIZE>& transform;
+            int size_x;
+            int size_y;
+            float fov;
+            float max_pan;
+            float min_pan;
+            float max_tilt;
+            float min_tilt;
+        };
+
         const std::unordered_map<ImageType, std::string> ImageTypeStrings{ { Color, "Color" }, { Depth, "Depth" }, { Environment, "Environment" } };
 
         ViewData();
@@ -41,7 +53,7 @@ namespace mft
         bool unload_image_data();
 
         // Load camera data in the native engine camera class
-        virtual bool load_camera_data( const std::array<float, MAT4_SIZE>& transform, int sizex, int sizey, float fov ) = 0;
+        virtual bool load_camera_data( const CameraData& camera_data ) = 0;
 
         // Create an image container and return the pointer to the data buffer
         // ImageType is used to keep track which type of image buffer was created
