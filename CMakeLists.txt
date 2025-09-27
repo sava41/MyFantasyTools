@@ -16,6 +16,14 @@ file(MAKE_DIRECTORY ${GENERATED_DIR})
 
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 
+if(APPLE)
+    set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+    set(CMAKE_HAVE_THREADS_LIBRARY 1)
+    set(CMAKE_USE_WIN32_THREADS_INIT 0)
+    set(CMAKE_USE_PTHREADS_INIT 1)
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+endif()
+
 add_subdirectory(source/core)
 add_subdirectory(source/blender_plugin)
 add_subdirectory(source/godot_plugin)
