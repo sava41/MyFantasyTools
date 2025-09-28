@@ -10,12 +10,12 @@ FetchContent_MakeAvailable(godot-cpp)
 add_library( mft_godot SHARED)
 
 target_sources( mft_godot PRIVATE
-    mf_manager.h
-    mf_manager.cpp
-    mf_level.h
-    mf_level.cpp
-    mf_viewdata.h
-    mf_viewdata.cpp
+    gd_manager.h
+    gd_manager.cpp
+    gd_level.h
+    gd_level.cpp
+    gd_viewdata.h
+    gd_viewdata.cpp
     register_types.cpp
 )
 

@@ -1,6 +1,6 @@
-#include "mf_level.h"
+#include "gd_level.h"
 
-#include "mf_manager.h"
+#include "gd_manager.h"
 
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/engine.hpp>

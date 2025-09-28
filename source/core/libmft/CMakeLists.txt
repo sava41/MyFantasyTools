@@ -1,4 +1,4 @@
-add_library(mflib STATIC view_data.cpp view_data.h mft_math.h level.h level.cpp)
+add_library(mflib STATIC mf_view_data.cpp mf_view_data.h mf_math.h mf_level.h mf_level.cpp)
 add_dependencies(mflib mfutilities flatc generate_flatbuffers)
 target_include_directories(mflib PRIVATE ${GENERATED_DIR})
 target_include_directories(mflib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -1,5 +1,5 @@
 
-#include "view_data.h"
+#include "mf_view_data.h"
 
 #include "io.h"
 #include "jxl.h"

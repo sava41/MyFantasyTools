@@ -1,12 +1,12 @@
 #pragma once
 
-#include "mf_viewdata.h"
+#include "gd_viewdata.h"
 
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/templates/vector.hpp>
-#include <view_level_manager.h>
+#include <mf_view_level_manager.h>
 
 class MFManager : public godot::Object
 {

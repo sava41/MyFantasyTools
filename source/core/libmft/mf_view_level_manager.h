@@ -1,8 +1,8 @@
 
 #pragma once
 
-#include "level.h"
-#include "view_data.h"
+#include "mf_level.h"
+#include "mf_view_data.h"
 
 #include <array>
 #include <cassert>

@@ -1,8 +1,8 @@
-#include "level.h"
+#include "mf_level.h"
 
 #include "io.h"
 #include "level_generated.h"
-#include "mft_math.h"
+#include "mf_math.h"
 
 namespace mft
 {

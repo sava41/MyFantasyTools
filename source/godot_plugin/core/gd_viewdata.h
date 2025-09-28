@@ -1,7 +1,7 @@
 #pragma once
 
 #include <godot_cpp/classes/image.hpp>
-#include <view_data.h>
+#include <mf_view_data.h>
 
 class MFViewData : public mft::ViewData
 {
