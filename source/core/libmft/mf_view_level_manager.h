@@ -2,7 +2,7 @@
 #pragma once
 
 #include "mf_level.h"
-#include "mf_view_data.h"
+#include "mf_view_resources.h"
 
 #include <array>
 #include <cassert>
@@ -13,13 +13,13 @@
 namespace mft
 {
 
-    class ViewData;
+    class ViewResources;
 
-    template <typename ViewDataImpl>
+    template <typename ViewResourcesImpl>
     class ViewLevelManager : public Level
     {
       public:
-        static_assert( std::is_base_of_v<ViewData, ViewDataImpl>, "ViewDataImpl must inherit from ViewData" );
+        static_assert( std::is_base_of_v<ViewResources, ViewResourcesImpl>, "ViewResourcesImpl must inherit from ViewResources" );
 
         ViewLevelManager()  = default;
         ~ViewLevelManager() = default;
@@ -34,10 +34,10 @@ namespace mft
             m_views.reserve( Level::get_num_views() );
             for( size_t i = 0; i < Level::get_num_views(); ++i )
             {
-                m_views.push_back( std::make_unique<ViewDataImpl>() );
+                m_views.push_back( std::make_unique<ViewResourcesImpl>() );
             }
 
-            ret = ret && Level::load_views( reinterpret_cast<std::vector<std::unique_ptr<ViewData>>&>( m_views ) );
+            ret = ret && Level::load_views( reinterpret_cast<std::vector<std::unique_ptr<ViewResources>>&>( m_views ) );
 
             return ret;
         }
@@ -47,7 +47,7 @@ namespace mft
             return m_views.size();
         }
 
-        std::unique_ptr<ViewDataImpl>& get_view( int viewIndex )
+        std::unique_ptr<ViewResourcesImpl>& get_view( int viewIndex )
         {
             assert( viewIndex >= 0 && viewIndex < get_num_views() );
 
@@ -55,7 +55,7 @@ namespace mft
         }
 
       private:
-        std::vector<std::unique_ptr<ViewDataImpl>> m_views;
+        std::vector<std::unique_ptr<ViewResourcesImpl>> m_views;
     };
 
 } // namespace mft

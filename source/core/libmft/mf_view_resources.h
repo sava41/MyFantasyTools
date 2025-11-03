@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include "level_generated.h"
+
 #include <array>
 #include <filesystem>
 #include <map>
@@ -13,7 +15,7 @@ constexpr int MAT4_SIZE = 16;
 namespace mft
 {
 
-    class ViewData
+    class ViewResources
     {
       public:
         enum ImageType : uint32_t
@@ -23,37 +25,25 @@ namespace mft
             Environment = 1 << 2
         };
 
-        struct CameraData
-        {
-            std::array<float, MAT4_SIZE>& transform;
-            int size_x;
-            int size_y;
-            float fov;
-            float max_pan;
-            float min_pan;
-            float max_tilt;
-            float min_tilt;
-        };
-
         const std::unordered_map<ImageType, std::string> ImageTypeStrings{ { Color, "Color" }, { Depth, "Depth" }, { Environment, "Environment" } };
 
-        ViewData();
-        ~ViewData();
+        ViewResources();
+        ~ViewResources();
 
-        ViewData( const ViewData& )  = delete;
-        ViewData( ViewData&& other ) = delete;
+        ViewResources( const ViewResources& )  = delete;
+        ViewResources( ViewResources&& other ) = delete;
 
-        ViewData& operator=( const ViewData& ) = delete;
-        ViewData& operator=( ViewData&& )      = delete;
+        ViewResources& operator=( const ViewResources& ) = delete;
+        ViewResources& operator=( ViewResources&& )      = delete;
 
-        void init( const std::string& name, const std::filesystem::path& data_dir, unsigned int image_type_flags );
+        void init( const mft::data::View* view_info, const std::filesystem::path& data_dir );
 
         bool is_data_loaded() const;
         bool load_image_data();
         bool unload_image_data();
 
         // Load camera data in the native engine camera class
-        virtual bool load_camera_data( const CameraData& camera_data ) = 0;
+        virtual bool load_camera_data() = 0;
 
         // Create an image container and return the pointer to the data buffer
         // ImageType is used to keep track which type of image buffer was created
@@ -63,12 +53,8 @@ namespace mft
         virtual void destroy_image_buffers() = 0;
 
       public:
-        std::string m_name;
-        int m_id;
-        int m_size_x;
-        int m_size_y;
-
         unsigned int m_image_type_flags;
+        const data::View* m_view_info;
 
       private:
         std::unordered_map<ImageType, std::filesystem::path> m_image_paths;

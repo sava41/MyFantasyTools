@@ -1,7 +1,6 @@
 #include "mf_level.h"
 
 #include "io.h"
-#include "level_generated.h"
 #include "mf_math.h"
 
 namespace mft
@@ -22,35 +21,32 @@ namespace mft
         m_data_file_path  = level_file_path.parent_path() / std::filesystem::path( level->data_path()->str() );
         printf( "Data path: %s\n", level->data_path()->c_str() );
 
+        m_level_info = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
+
         return true;
     }
 
-    bool Level::load_views( std::vector<std::unique_ptr<ViewData>>& views )
+    bool Level::load_views( std::vector<std::unique_ptr<ViewResources>>& view_resources )
     {
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
-        const auto* views_data = level->views();
-
-        assert( views_data->size() == views.size() );
-
-        for( int i = 0; i < views.size(); ++i )
+        if( m_level_info == nullptr )
         {
-            const auto* const view_data = views_data->Get( i );
+            return false;
+        }
 
-            const auto* world_transform_ptr = view_data->world_transform();
-            std::array<float, MAT4_SIZE> transform(
-                { world_transform_ptr->m00(), world_transform_ptr->m01(), world_transform_ptr->m02(), world_transform_ptr->m03(), world_transform_ptr->m10(),
-                  world_transform_ptr->m11(), world_transform_ptr->m12(), world_transform_ptr->m13(), world_transform_ptr->m20(), world_transform_ptr->m21(),
-                  world_transform_ptr->m22(), world_transform_ptr->m23(), world_transform_ptr->m30(), world_transform_ptr->m31(), world_transform_ptr->m32(),
-                  world_transform_ptr->m33() } );
+        const auto* views = m_level_info->views();
 
-            views.at( i )->init( view_data->name()->c_str(), m_data_file_path, ViewData::Color | ViewData::Depth | ViewData::Environment );
+        assert( views->size() == view_resources.size() );
 
-            views.at( i )->load_image_data();
-            views.at( i )->load_camera_data( { transform, view_data->res_x(), view_data->res_y(), view_data->fov(), view_data->max_pan(), view_data->min_pan(),
-                                               view_data->max_tilt(), view_data->min_tilt() } );
+        for( int i = 0; i < view_resources.size(); ++i )
+        {
+            const auto* const view_info = views->Get( i );
 
-            printf( "loaded %s\n", view_data->name()->c_str() );
+            view_resources.at( i )->init( view_info, m_data_file_path );
+
+            view_resources.at( i )->load_image_data();
+            view_resources.at( i )->load_camera_data();
+
+            printf( "loaded %s\n", view_info->name()->c_str() );
         }
 
         return true;

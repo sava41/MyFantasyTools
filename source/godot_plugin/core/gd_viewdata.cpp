@@ -4,19 +4,17 @@
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
 
-bool MFViewData::load_camera_data( const mft::ViewData::CameraData& camera_data )
+bool GDViewResources::load_camera_data()
 {
 
-    m_fov = camera_data.fov;
-
-    m_size_x = camera_data.size_x;
-    m_size_y = camera_data.size_y;
+    const auto* transform_ptr = m_view_info->world_transform();
 
     // Transform comes in as 1x16 vector representing 4x4 matrix
     // Godot transform constructor takes basis vectors first and offset vector last
-    m_transform = godot::Transform3D( camera_data.transform[0], camera_data.transform[1], camera_data.transform[2], camera_data.transform[4],
-                                      camera_data.transform[5], camera_data.transform[6], camera_data.transform[8], camera_data.transform[9],
-                                      camera_data.transform[10], camera_data.transform[3], camera_data.transform[7], camera_data.transform[11] );
+    m_transform = godot::Transform3D( transform_ptr->m00(), transform_ptr->m01(), transform_ptr->m02(), transform_ptr->m10(), transform_ptr->m11(),
+                                      transform_ptr->m12(), transform_ptr->m20(), transform_ptr->m21(), transform_ptr->m22(), transform_ptr->m30(),
+                                      transform_ptr->m31(), transform_ptr->m32() );
+
 
     // Input tranform is z-up we need to convert to y-up for godot
     m_transform.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );
@@ -24,7 +22,7 @@ bool MFViewData::load_camera_data( const mft::ViewData::CameraData& camera_data 
     return true;
 }
 
-void* MFViewData::create_image_buffer( int sizex, int sizey, int channels, size_t buffer_size, const ImageType& type )
+void* GDViewResources::create_image_buffer( int sizex, int sizey, int channels, size_t buffer_size, const ImageType& type )
 {
     assert( channels == 3 || channels == 1 );
 
@@ -46,6 +44,6 @@ void* MFViewData::create_image_buffer( int sizex, int sizey, int channels, size_
     return nullptr;
 }
 
-void MFViewData::destroy_image_buffers()
+void GDViewResources::destroy_image_buffers()
 {
 }

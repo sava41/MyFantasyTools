@@ -16,13 +16,13 @@ class ViewDataSimple : public mft::ViewData
     {
         switch( type )
         {
-        case mft::ViewData::Color:
+        case mft::ViewResources::Color:
             m_color.resize( buffer_size );
             return m_color.data();
-        case mft::ViewData::Depth:
+        case mft::ViewResources::Depth:
             m_depth.resize( buffer_size );
             return m_depth.data();
-        case mft::ViewData::Environment:
+        case mft::ViewResources::Environment:
             m_env.resize( buffer_size );
             return m_env.data();
         }

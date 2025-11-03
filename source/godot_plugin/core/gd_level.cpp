@@ -123,10 +123,10 @@ void MFLevel::setup_cameras()
 
         for( int i = 0; i < MFManager::get()->get_num_views(); ++i )
         {
-            const std::unique_ptr<MFViewData>& view_data = MFManager::get()->get_view_data( i );
+            const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( i );
 
             godot::Camera3D* camera = memnew( godot::Camera3D() );
-            camera->set_name( godot::String( view_data->m_name.c_str() ) );
+            camera->set_name( godot::String( view_data->m_view_info->name()->c_str() ) );
             camera->set_transform( view_data->m_transform );
 
             add_child( camera );
@@ -134,7 +134,7 @@ void MFLevel::setup_cameras()
 
             m_editorCameras.push_back( camera );
 
-            godot::UtilityFunctions::print( "made camera ", view_data->m_name.c_str() );
+            godot::UtilityFunctions::print( "made camera ", view_data->m_view_info->name()->c_str() );
         }
     }
 }
@@ -152,7 +152,7 @@ void MFLevel::setup_navmesh()
     collisionShape->set_owner( this );
 }
 
-bool MFLevel::set_view( int viewId )
+bool MFLevel::set_view( int view_id )
 {
     if( m_editorMode )
     {
@@ -165,7 +165,9 @@ bool MFLevel::set_view( int viewId )
         return false;
     }
 
-    const std::unique_ptr<MFViewData>& view_data = MFManager::get()->get_view_data( viewId );
+    int m_cur_camera_index = view_id;
+
+    const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( view_id );
 
     m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_data->m_colorBuffer ) );
     m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_data->m_depthBuffer ) );
@@ -174,13 +176,18 @@ bool MFLevel::set_view( int viewId )
 
     m_gameCamera->set_current( true );
     m_gameCamera->set_transform( view_data->m_transform );
-    m_gameCamera->set_fov( view_data->m_fov );
+    m_gameCamera->set_fov( view_data->m_view_info->fov() );
 
-    godot::UtilityFunctions::print( "set camera: ", godot::String( view_data->m_name.c_str() ) );
+    godot::UtilityFunctions::print( "set camera: ", godot::String( view_data->m_view_info->name()->c_str() ) );
 
     m_minViewDurationtimer->start( m_minViewDuration );
 
     return true;
+}
+
+bool MFLevel::look_at( const godot::Vector3& point )
+{
+    const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( m_cur_camera_index );
 }
 
 bool MFLevel::set_closest_view( const godot::Vector3& point )

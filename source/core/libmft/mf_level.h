@@ -1,6 +1,7 @@
 #pragma once
 
-#include "mf_view_data.h"
+#include "level_generated.h"
+#include "mf_view_resources.h"
 
 #include <filesystem>
 #include <string>
@@ -24,9 +25,11 @@ namespace mft
         std::array<float, 9> get_navmesh_tri_verts( int triIndex );
 
       protected:
-        bool load_views( std::vector<std::unique_ptr<ViewData>>& views );
+        bool load_views( std::vector<std::unique_ptr<ViewResources>>& view_resources );
 
         std::vector<char> m_data_buffer;
+        const mft::data::Level* m_level_info = nullptr;
+
         std::filesystem::path m_data_file_path;
     };
 

@@ -1,5 +1,5 @@
 
-#include "mf_view_data.h"
+#include "mf_view_resources.h"
 
 #include "io.h"
 #include "jxl.h"
@@ -7,26 +7,31 @@
 namespace mft
 {
 
-    ViewData::ViewData()
+    ViewResources::ViewResources()
         : m_is_init( false )
         , m_images_loaded( false )
+        , m_view_info( nullptr )
     {
     }
 
-    ViewData::~ViewData()
+    ViewResources::~ViewResources()
     {
         unload_image_data();
     }
 
-    void ViewData::init( const std::string& name, const std::filesystem::path& data_dir, unsigned int image_type_flags )
+    void ViewResources::init( const mft::data::View* view_info, const std::filesystem::path& data_dir )
     {
-        m_name             = name;
-        m_image_type_flags = image_type_flags;
+        m_view_info = view_info;
+
+        // TODO: for now views have hardcoded channels
+        m_image_type_flags = Color | Depth | Environment;
+
+        std::string name = view_info->name()->c_str();
 
         for( const auto& type : ImageTypeStrings )
         {
             unsigned int type_int = static_cast<unsigned int>( type.first );
-            if( type_int & image_type_flags )
+            if( type_int & m_image_type_flags )
             {
                 m_image_paths.insert( { type.first, data_dir / std::filesystem::path( name + "_" + type.second + ".jxl" ) } );
             }
@@ -35,7 +40,7 @@ namespace mft
         m_is_init = true;
     }
 
-    bool ViewData::load_image_data()
+    bool ViewResources::load_image_data()
     {
         if( m_images_loaded || !m_is_init )
             return false;
@@ -63,7 +68,7 @@ namespace mft
         return true;
     }
 
-    bool ViewData::unload_image_data()
+    bool ViewResources::unload_image_data()
     {
         destroy_image_buffers();
 
@@ -74,7 +79,7 @@ namespace mft
         return true;
     }
 
-    bool ViewData::is_data_loaded() const
+    bool ViewResources::is_data_loaded() const
     {
         return m_images_loaded == m_image_type_flags;
     }

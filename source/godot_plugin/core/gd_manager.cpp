@@ -53,7 +53,7 @@ int MFManager::get_num_views()
     return m_manager.get_num_views();
 }
 
-const std::unique_ptr<MFViewData>& MFManager::get_view_data( int viewId )
+const std::unique_ptr<GDViewResources>& MFManager::get_view_data( int viewId )
 {
     if( viewId < 0 || viewId >= m_manager.get_num_views() || viewId == m_currentViewId )
     {

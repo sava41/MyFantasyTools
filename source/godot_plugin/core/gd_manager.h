@@ -28,14 +28,14 @@ class MFManager : public godot::Object
     godot::String get_current_level();
     int get_num_views();
     int get_closest_view_Id( const godot::Vector3& point );
-    const std::unique_ptr<MFViewData>& get_view_data( int viewId );
+    const std::unique_ptr<GDViewResources>& get_view_data( int viewId );
     godot::PackedVector3Array get_navmesh();
 
     bool set_current_view( int viewId );
 
   private:
     static inline MFManager* m_static_inst = nullptr;
-    mft::ViewLevelManager<MFViewData> m_manager;
+    mft::ViewLevelManager<GDViewResources> m_manager;
     int m_currentViewId;
 
     godot::String m_currentLevel;
