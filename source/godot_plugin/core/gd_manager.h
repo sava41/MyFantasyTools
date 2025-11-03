@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gd_viewdata.h"
+#include "gd_view_resources.h"
 
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/node.hpp>

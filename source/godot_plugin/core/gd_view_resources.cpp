@@ -1,4 +1,4 @@
-#include "gd_viewdata.h"
+#include "gd_view_resources.h"
 
 #include <cassert>
 #include <godot_cpp/classes/engine.hpp>

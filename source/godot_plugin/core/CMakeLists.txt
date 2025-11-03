@@ -14,8 +14,8 @@ target_sources( mft_godot PRIVATE
     gd_manager.cpp
     gd_level.h
     gd_level.cpp
-    gd_viewdata.h
-    gd_viewdata.cpp
+    gd_view_resources.h
+    gd_view_resources.cpp
     register_types.cpp
 )
 
