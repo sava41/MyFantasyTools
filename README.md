@@ -27,6 +27,8 @@ Note: If the build setup has issues finding python, try manually setting `Python
 ### Blender Plugin
 The Blender plugin automates exporting a Blender scene into an MFT level. After building and installing the project, the `mft_blender_addon` directory can be zipped and installed using the `Install from disk` option in Blenders settings. Pre-built addons can be found in the releases (Windows and MacOs only).
 
+For plugin development I like to use https://marketplace.visualstudio.com/items?itemName=JacquesLucke.blender-development. You can set the plugin path to the install directory and hot reload as you code. 
+
 ### Godot Plugin
 The Godot addon allows you to import and use `.mflevel` files. After building and installing the plugin will be found in the `mft_godot_plugin` directory. 
 

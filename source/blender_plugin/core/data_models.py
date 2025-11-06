@@ -25,7 +25,7 @@ class MFT_Camera(PropertyGroup):
     max_pan: FloatProperty(
         name="Max Pan",
         description="Maximum pan angle in degrees",
-        default=45.0,
+        default=0.0,
         min=0.0,
         max=360.0,
         subtype='ANGLE'
@@ -33,7 +33,7 @@ class MFT_Camera(PropertyGroup):
     max_tilt: FloatProperty(
         name="Max Tilt",
         description="Maximum tilt angle in degrees",
-        default=30.0,
+        default=0.0,
         min=0.0,
         max=90.0,
         subtype='ANGLE'

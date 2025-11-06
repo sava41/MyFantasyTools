@@ -37,6 +37,8 @@ def serialize_level(navmesh, views) -> bytearray:
         View.AddFov(builder, view._fov)
         View.AddResX(builder, view._res_x)
         View.AddResY(builder, view._res_y)
+        View.AddMaxPan(builder, view._max_pan)
+        View.AddMaxTilt(builder, view._max_tilt)
         matrix_world = view._main_camera.matrix_world
         View.AddWorldTransform(
             builder,

@@ -5,6 +5,7 @@ from enum import Enum
 
 from .composite import *
 
+#TODO: should to merge this and the MFT_Camera class at some point
 class View:
     class RenderType(Enum):
         Main = 1
@@ -21,28 +22,54 @@ class View:
     _env_camera_obj = None
     _res_x = 1920
     _res_y = 1080
+    _uncropped_res_x = 1920
+    _uncropped_res_y = 1080
     _aspect = 1.0
     _fov = 90
+    _uncropped_fov = 90
     _render_output_path = ""
     _adjacent_views = {}
+
+    _max_pan = 0
+    _max_tilt = 0
     
     _current_render = RenderType.Main
 
     def __init__(self, object, output_path):
-        self._main_camera = object
-        self._aspect = float(self._res_y) / float(self._res_x)
-        self._fov = math.degrees(object.data.angle)
-        self._render_output_path = output_path + "//renders//" + object.name
+        
+        self._max_pan = object.max_pan
+        self._max_tilt = object.max_tilt
+        
+        camera = object.camera
 
+        self._main_camera = camera.copy()
+        self._main_camera.data = camera.data.copy()
+        self._aspect = float(self._res_y) / float(self._res_x)
+        
+        #horizontal fov
+        self._fov = camera.data.angle
+        self._render_output_path = output_path + "//renders//" + camera.name
+
+        self._uncropped_fov = camera.data.angle + object.max_pan
+        
+        vfov = 2 * math.atan( math.tan(camera.data.angle) * self._aspect )
+        uncropped_vfov = vfov + object.max_tilt
+
+        self._uncropped_res_x = self._res_x / self._fov * self._uncropped_fov 
+        self._uncropped_res_y = self._res_y / vfov * uncropped_vfov
+
+        self._main_camera.data.angle = self._uncropped_fov
         self._main_camera.data.type = "PERSP"
 
-        self._env_camera = bpy.data.cameras.new(object.name + "_env")
-        self._env_camera_obj = bpy.data.objects.new(object.name + "_env", self._env_camera)
+        self._env_camera = bpy.data.cameras.new(camera.name + "_env")
+        self._env_camera_obj = bpy.data.objects.new(camera.name + "_env", self._env_camera)
     
         bpy.context.scene.collection.objects.link(self._env_camera_obj)
         self._env_camera_obj.rotation_euler[0] = math.radians(90)
         self._env_camera_obj.data.type = "PANO"
         self._env_camera_obj.data.panorama_type = "EQUIRECTANGULAR"
+
+
     
     def __del__(self):
         #TODO: figure out if we need to remove this from the collection?
@@ -53,8 +80,8 @@ class View:
     def set_next_camera_active(self, scene, composite_manager):
         if self._current_render is self.RenderType.Main:
             scene.camera = self._main_camera
-            scene.render.resolution_x = self._res_x
-            scene.render.resolution_y = self._res_y
+            scene.render.resolution_x = int(self._uncropped_res_x)
+            scene.render.resolution_y = int(self._uncropped_res_y)
             composite_manager.set_main_output(self._render_output_path)
         
         elif self._current_render is self.RenderType.Probe:
@@ -120,8 +147,8 @@ class View:
 
 def create_view_list(cameras, output_path) -> list:
     views = list()
-    for ob in cameras:
-        views.append(View(ob.camera, output_path))
+    for object in cameras:
+        views.append(View(object, output_path))
 
     if len(views) == 0:
         print("Error: No cameras found")
