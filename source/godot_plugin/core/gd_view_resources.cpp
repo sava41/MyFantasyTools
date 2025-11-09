@@ -12,8 +12,8 @@ bool GDViewResources::load_camera_data()
     // Transform comes in as 1x16 vector representing 4x4 matrix
     // Godot transform constructor takes basis vectors first and offset vector last
     m_transform = godot::Transform3D( transform_ptr->m00(), transform_ptr->m01(), transform_ptr->m02(), transform_ptr->m10(), transform_ptr->m11(),
-                                      transform_ptr->m12(), transform_ptr->m20(), transform_ptr->m21(), transform_ptr->m22(), transform_ptr->m30(),
-                                      transform_ptr->m31(), transform_ptr->m32() );
+                                      transform_ptr->m12(), transform_ptr->m20(), transform_ptr->m21(), transform_ptr->m22(), transform_ptr->m03(),
+                                      transform_ptr->m13(), transform_ptr->m23() );
 
 
     // Input tranform is z-up we need to convert to y-up for godot

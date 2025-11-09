@@ -11,6 +11,7 @@
 #include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/classes/shader.hpp>
 #include <godot_cpp/classes/sky.hpp>
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 MFLevel::MFLevel( const godot::String& path )
@@ -49,7 +50,7 @@ void MFLevel::_enter_tree()
         m_gameCamera->add_child( m_background );
         add_child( m_gameCamera );
 
-        godot::String shader = godot::FileAccess::get_file_as_string( "/Users/savanozin/Documents/MyFantasyGodot/demo/background.gdshader" );
+        godot::String shader = godot::FileAccess::get_file_as_string( "res://addons/mft_godot_plugin/background.gdshader" );
 
         godot::Ref<godot::Shader> backgroundShader = memnew( godot::Shader );
         backgroundShader->set_code( shader );
@@ -167,18 +168,18 @@ bool MFLevel::set_view( int view_id )
 
     int m_cur_camera_index = view_id;
 
-    const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( view_id );
+    const std::unique_ptr<GDViewResources>& view_resources = MFManager::get()->get_view_data( view_id );
 
-    m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_data->m_colorBuffer ) );
-    m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_data->m_depthBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_resources->m_colorBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_resources->m_depthBuffer ) );
 
-    m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_data->m_envBuffer ) );
+    m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_resources->m_envBuffer ) );
 
     m_gameCamera->set_current( true );
-    m_gameCamera->set_transform( view_data->m_transform );
-    m_gameCamera->set_fov( view_data->m_view_info->fov() );
+    m_gameCamera->set_transform( view_resources->m_transform );
+    m_gameCamera->set_fov( godot::Math::rad_to_deg( view_resources->m_view_info->fov() ) );
 
-    godot::UtilityFunctions::print( "set camera: ", godot::String( view_data->m_view_info->name()->c_str() ) );
+    godot::UtilityFunctions::print( "set camera: ", godot::String( view_resources->m_view_info->name()->c_str() ) );
 
     m_minViewDurationtimer->start( m_minViewDuration );
 
