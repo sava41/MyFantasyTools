@@ -178,8 +178,6 @@ bool MFLevel::set_view( int view_id )
     m_backgroundMaterial->set_shader_parameter( "uncropped_aspect", view_resources->m_view_info->aspect() );
     m_backgroundMaterial->set_shader_parameter( "uncropped_view_mat", view_resources->m_transform );
 
-    godot::UtilityFunctions::print( "uncropped aspect ", view_resources->m_view_info->aspect() );
-
     m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_resources->m_envBuffer ) );
 
     m_gameCamera->set_current( true );
@@ -213,14 +211,24 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     {
         godot::Vector3 camera_space_point = camera_tranform_uncropped.xform_inv( point );
 
-        float pan  = godot::Math::clamp( sin( -camera_space_point.z / camera_space_point.x ), -max_pan, max_pan );
-        float tilt = godot::Math::clamp( sin( camera_space_point.y / -camera_space_point.z ), -max_tilt, max_tilt );
+        // Extract pan (horizontal angle around Y axis) and tilt (vertical angle)
+        float distance        = camera_space_point.length();
+        float horizontal_dist = sqrt( camera_space_point.x * camera_space_point.x + camera_space_point.z * camera_space_point.z );
 
-        point =
-            camera_tranform_uncropped.xform( godot::Vector3( sin( pan ) * cos( tilt ), sin( pan ) * sin( tilt ), cos( pan ) ) * camera_space_point.length() );
+        float pan  = atan2( camera_space_point.x, -camera_space_point.z );
+        float tilt = atan2( camera_space_point.y, horizontal_dist );
+
+        // Clamp to max bounds
+        pan  = godot::Math::clamp( pan, -max_pan * 0.5f, max_pan * 0.5f );
+        tilt = godot::Math::clamp( tilt, -max_tilt * 0.5f, max_tilt * 0.5f );
+
+        // Reconstruct direction from clamped pan/tilt
+        godot::Vector3 clamped_direction( cos( tilt ) * sin( pan ), sin( tilt ), -cos( tilt ) * cos( pan ) );
+
+        point = camera_tranform_uncropped.xform( clamped_direction * distance );
     }
 
-    godot::Vector3 camera_forward = camera_tranform.basis.rows[2];
+    godot::Vector3 camera_forward = -camera_tranform.basis.rows[2];
 
     point = camera_forward.slerp( point, 1.0 - smooth );
 
