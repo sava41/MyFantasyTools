@@ -26,7 +26,7 @@ class MFLevel : public godot::Node3D
     void _enter_tree() override;
     bool set_view( int view_id );
     bool set_closest_view( const godot::Vector3& point );
-    bool look_at( const godot::Vector3& point );
+    bool look_at( godot::Vector3 point, bool clamp_region = true, float smooth = 0.0 );
 
     void set_min_view_duration( float timeMS );
     float get_min_view_duration() const;

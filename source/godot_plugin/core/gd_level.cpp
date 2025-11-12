@@ -166,18 +166,25 @@ bool MFLevel::set_view( int view_id )
         return false;
     }
 
-    int m_cur_camera_index = view_id;
+    m_cur_camera_index = view_id;
 
     const std::unique_ptr<GDViewResources>& view_resources = MFManager::get()->get_view_data( view_id );
 
     m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_resources->m_colorBuffer ) );
     m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_resources->m_depthBuffer ) );
 
+    m_backgroundMaterial->set_shader_parameter( "fov", view_resources->m_view_info->cropped_fov() );
+    m_backgroundMaterial->set_shader_parameter( "uncropped_fov", view_resources->m_view_info->fov() );
+    m_backgroundMaterial->set_shader_parameter( "uncropped_aspect", view_resources->m_view_info->aspect() );
+    m_backgroundMaterial->set_shader_parameter( "uncropped_view_mat", view_resources->m_transform );
+
+    godot::UtilityFunctions::print( "uncropped aspect ", view_resources->m_view_info->aspect() );
+
     m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_resources->m_envBuffer ) );
 
     m_gameCamera->set_current( true );
     m_gameCamera->set_transform( view_resources->m_transform );
-    m_gameCamera->set_fov( godot::Math::rad_to_deg( view_resources->m_view_info->fov() ) );
+    m_gameCamera->set_fov( godot::Math::rad_to_deg( view_resources->m_view_info->cropped_fov() ) );
 
     godot::UtilityFunctions::print( "set camera: ", godot::String( view_resources->m_view_info->name()->c_str() ) );
 
@@ -186,9 +193,42 @@ bool MFLevel::set_view( int view_id )
     return true;
 }
 
-bool MFLevel::look_at( const godot::Vector3& point )
+// this function currently assumes the camera fov is set to cropped_fpv
+bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
 {
+    if( m_editorMode )
+    {
+        return false;
+    }
+
     const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( m_cur_camera_index );
+
+    float max_pan  = view_data->m_view_info->max_pan();
+    float max_tilt = view_data->m_view_info->max_tilt();
+
+    godot::Transform3D camera_tranform_uncropped = view_data->m_transform;
+    godot::Transform3D camera_tranform           = m_gameCamera->get_camera_transform();
+
+    if( clamp_region )
+    {
+        godot::Vector3 camera_space_point = camera_tranform_uncropped.xform_inv( point );
+
+        float pan  = godot::Math::clamp( sin( -camera_space_point.z / camera_space_point.x ), -max_pan, max_pan );
+        float tilt = godot::Math::clamp( sin( camera_space_point.y / -camera_space_point.z ), -max_tilt, max_tilt );
+
+        point =
+            camera_tranform_uncropped.xform( godot::Vector3( sin( pan ) * cos( tilt ), sin( pan ) * sin( tilt ), cos( pan ) ) * camera_space_point.length() );
+    }
+
+    godot::Vector3 camera_forward = camera_tranform.basis.rows[2];
+
+    point = camera_forward.slerp( point, 1.0 - smooth );
+
+    godot::Transform3D camera_tranform_new = camera_tranform.looking_at( point );
+
+    m_gameCamera->set_transform( camera_tranform_new );
+
+    return true;
 }
 
 bool MFLevel::set_closest_view( const godot::Vector3& point )
@@ -230,6 +270,7 @@ void MFLevel::_bind_methods()
 {
     godot::ClassDB::bind_method( godot::D_METHOD( "set_view", "viewId" ), &MFLevel::set_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "set_closest_view", "point" ), &MFLevel::set_closest_view );
+    godot::ClassDB::bind_method( godot::D_METHOD( "look_at", "point", "clamp_region", "smooth_rate" ), &MFLevel::look_at );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "set_min_view_duration", "time ms" ), &MFLevel::set_min_view_duration );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_min_view_duration" ), &MFLevel::get_min_view_duration );

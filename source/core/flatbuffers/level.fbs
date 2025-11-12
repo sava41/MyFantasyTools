@@ -37,6 +37,7 @@ table View {
   name: string;
   world_transform: Mat4;
   aspect: float;
+  cropped_fov: float;
   fov: float;
   res_x: uint16;
   res_y: uint16;
@@ -50,6 +51,8 @@ table View {
 table Level {
   name: string;
   data_path: string;
+  target_res_x: uint16;
+  target_res_y: uint16;
   views: [View];
   navmesh_verts: [Vec3];
   navmesh_tris: [Triangle];
