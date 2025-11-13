@@ -50,12 +50,45 @@ class View:
         self._fov = camera.data.angle
         self._render_output_path = output_path + "//renders//" + camera.name
 
-        self._uncropped_fov = camera.data.angle + object.max_pan
-        
-        vfov = 2 * math.atan( math.tan(camera.data.angle) * self._aspect )
-        uncropped_vfov = vfov + object.max_tilt
+        # Compute actual FOV needed by checking rotated frustum corners
+        hfov_half = camera.data.angle * 0.5
+        vfov = 2 * math.atan( math.tan(camera.data.angle * 0.5) * self._aspect )
+        vfov_half = vfov * 0.5
 
-        self._uncropped_res_x = self._res_x / self._fov * self._uncropped_fov 
+        # Check all 4 corners at max rotation to find required FOV
+        max_angle_h = 0
+        max_angle_v = 0
+
+        for corner_h in [-hfov_half, hfov_half]:
+            for corner_v in [-vfov_half, vfov_half]:
+                # Create corner ray direction
+                corner_dir = mathutils.Vector((
+                    math.sin(corner_h) * math.cos(corner_v),
+                    math.sin(corner_v),
+                    -math.cos(corner_h) * math.cos(corner_v)
+                ))
+
+                # Rotate by max pan (around Y axis)
+                rot_pan = mathutils.Matrix.Rotation(object.max_pan, 3, 'Y')
+                # Rotate by max tilt (around X axis)
+                rot_tilt = mathutils.Matrix.Rotation(object.max_tilt, 3, 'X')
+
+                # Apply rotations (order matters: tilt then pan)
+                rotated_dir = rot_pan @ rot_tilt @ corner_dir
+
+                # Compute angles from optical axis
+                horizontal_dist = math.sqrt(rotated_dir.x**2 + rotated_dir.z**2)
+                angle_h = abs(math.atan2(rotated_dir.x, -rotated_dir.z))
+                angle_v = abs(math.atan2(rotated_dir.y, horizontal_dist))
+
+                max_angle_h = max(max_angle_h, angle_h)
+                max_angle_v = max(max_angle_v, angle_v)
+
+        # Set uncropped FOV to cover the maximum angles (with small safety margin)
+        self._uncropped_fov = max_angle_h * 2.0 * 1.05
+        uncropped_vfov = max_angle_v * 2.0 * 1.05
+
+        self._uncropped_res_x = self._res_x / self._fov * self._uncropped_fov
         self._uncropped_res_y = self._res_y / vfov * uncropped_vfov
 
         self._main_camera.data.angle = self._uncropped_fov
