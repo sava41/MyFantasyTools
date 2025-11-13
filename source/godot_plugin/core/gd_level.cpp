@@ -204,6 +204,11 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     float max_pan  = view_data->m_view_info->max_pan();
     float max_tilt = view_data->m_view_info->max_tilt();
 
+    if( max_pan == 0.0 && max_tilt == 0.0 )
+    {
+        return false;
+    }
+
     godot::Transform3D camera_tranform_uncropped = view_data->m_transform;
     godot::Transform3D camera_tranform           = m_gameCamera->get_camera_transform();
 
