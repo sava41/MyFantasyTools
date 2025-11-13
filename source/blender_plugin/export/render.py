@@ -12,7 +12,7 @@ def set_renderer_params(context, scene):
     scene.view_layers[0].cycles.use_denoising = True
 
     scene.cycles.use_adaptive_sampling = True
-    scene.cycles.samples = 512
+    scene.cycles.samples = scene.mft_global_settings.render_samples
 
     scene.render.use_persistent_data = True
 

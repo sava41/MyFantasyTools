@@ -51,7 +51,13 @@ class MFT_PT_MainPanel(Panel):
         box = layout.box()
         box.label(text="Nav Mesh:")
         box.prop(scene.mft_global_settings, "navmesh_object", text="")
-        
+
+        box = layout.box()
+        box.label(text="Render Settings:")
+        box.prop(scene.mft_global_settings, "render_width")
+        box.prop(scene.mft_global_settings, "render_height")
+        box.prop(scene.mft_global_settings, "render_samples")
+
         box = layout.box()
         box.label(text="Export Path:")
         box.prop(scene.mft_global_settings, "export_directory", text="")

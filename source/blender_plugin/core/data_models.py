@@ -54,6 +54,28 @@ class MFT_GlobalSettings(PropertyGroup):
         poll=lambda self, obj: obj.type == 'MESH'
     )
 
+    render_width: IntProperty(
+        name="Resolution Width",
+        description="Render target resolution width in pixels",
+        default=1920,
+        min=1,
+        soft_max=7680
+    )
+    render_height: IntProperty(
+        name="Resolution Height",
+        description="Render target resolution height in pixels",
+        default=1080,
+        min=1,
+        soft_max=4320
+    )
+    render_samples: IntProperty(
+        name="Samples",
+        description="Number of render samples to use",
+        default=128,
+        min=1,
+        max=1024
+    )
+
     current_view: IntProperty(default=0)
     total_views: IntProperty(default=0)
     is_rendering: BoolProperty(default=False)

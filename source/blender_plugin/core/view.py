@@ -35,7 +35,10 @@ class View:
     
     _current_render = RenderType.Main
 
-    def __init__(self, object, output_path):
+    def __init__(self, object, output_path, scene):
+
+        self._res_x = scene.mft_global_settings.render_width
+        self._res_y = scene.mft_global_settings.render_height
         
         self._max_pan = object.max_pan
         self._max_tilt = object.max_tilt
@@ -84,9 +87,8 @@ class View:
                 max_angle_h = max(max_angle_h, angle_h)
                 max_angle_v = max(max_angle_v, angle_v)
 
-        # Set uncropped FOV to cover the maximum angles (with small safety margin)
-        self._uncropped_fov = max_angle_h * 2.0 * 1.05
-        uncropped_vfov = max_angle_v * 2.0 * 1.05
+        self._uncropped_fov = max_angle_h * 2.0
+        uncropped_vfov = max_angle_v * 2.0
 
         self._uncropped_res_x = self._res_x / self._fov * self._uncropped_fov
         self._uncropped_res_y = self._res_y / vfov * uncropped_vfov
@@ -178,10 +180,10 @@ class View:
         return self._main_camera.data["view_id"] < other._main_camera.data["view_id"]
 
 
-def create_view_list(cameras, output_path) -> list:
+def create_view_list(cameras, output_path, scene) -> list:
     views = list()
     for object in cameras:
-        views.append(View(object, output_path))
+        views.append(View(object, output_path, scene))
 
     if len(views) == 0:
         print("Error: No cameras found")

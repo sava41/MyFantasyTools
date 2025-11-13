@@ -124,9 +124,9 @@ class MFT_OT_Export(Operator):
         
         cameras = scene.mft_cameras
 
-        if context.scene.mft_global_settings.is_rendering:
+        if scene.mft_global_settings.is_rendering:
             # Cancel current render
-            context.scene.mft_global_settings.should_cancel = True
+            scene.mft_global_settings.should_cancel = True
             self.report({'INFO'}, "Cancelling render...")
             return {'FINISHED'}
 
@@ -151,7 +151,7 @@ class MFT_OT_Export(Operator):
             self.report({'ERROR'}, "No enabled cameras in the list")
             return {'CANCELLED'}
 
-        self._views = create_view_list(enabled_cameras, str(export_path_root.resolve()))
+        self._views = create_view_list(enabled_cameras, str(export_path_root.resolve()), scene)
         navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
 
         os.makedirs(export_path_final, exist_ok=True)
