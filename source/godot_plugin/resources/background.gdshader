@@ -46,7 +46,7 @@ void fragment() {
 
 	// Sample texture and clamp to black outside of 0-1 range
 	
-	ALBEDO.rgb = sample_zero_outside(color, uncropped_uv).bgr;
+	ALBEDO.rgb = sample_zero_outside(color, uncropped_uv).rgb;
 
 	// Reproject depth to cropped projection space
 	
