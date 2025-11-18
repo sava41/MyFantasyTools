@@ -39,6 +39,10 @@ void* GDViewResources::create_image_buffer( int sizex, int sizey, int channels, 
     case ImageType::Environment:
         m_envBuffer = godot::Image::create( sizex, sizey, false, godot::Image::FORMAT_RGBF );
         return const_cast<uint8_t*>( m_envBuffer->get_data().ptr() );
+
+    case ImageType::LightDirection:
+        m_lightDirectionBuffer = godot::Image::create( sizex, sizey, false, godot::Image::FORMAT_RGBF );
+        return const_cast<uint8_t*>( m_lightDirectionBuffer->get_data().ptr() );
     }
 
     return nullptr;

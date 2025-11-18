@@ -172,6 +172,7 @@ bool MFLevel::set_view( int view_id )
 
     m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_resources->m_colorBuffer ) );
     m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_resources->m_depthBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "light_direction", godot::ImageTexture::create_from_image( view_resources->m_lightDirectionBuffer ) );
 
     m_backgroundMaterial->set_shader_parameter( "fov", view_resources->m_view_info->cropped_fov() );
     m_backgroundMaterial->set_shader_parameter( "uncropped_fov", view_resources->m_view_info->fov() );

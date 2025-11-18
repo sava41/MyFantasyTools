@@ -20,4 +20,5 @@ class GDViewResources : public mft::ViewResources
     godot::Ref<godot::Image> m_colorBuffer;
     godot::Ref<godot::Image> m_depthBuffer;
     godot::Ref<godot::Image> m_envBuffer;
+    godot::Ref<godot::Image> m_lightDirectionBuffer;
 };

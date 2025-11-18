@@ -13,6 +13,7 @@ class CompositeManager:
 
         scene.view_layers["ViewLayer"].use_pass_combined = True
         scene.view_layers["ViewLayer"].use_pass_z = True
+        scene.view_layers["ViewLayer"].use_pass_dominant_direction = True
 
         self._tree = scene.node_tree
         for node in self._tree.nodes:
@@ -50,12 +51,22 @@ class CompositeManager:
         preview_slot.format.color_mode = "RGB"
         preview_slot.format.color_depth = "8"
 
+        # add light direction slot with RGB EXR format
+        self._output_node.file_slots.new("LightDirection#")
+        light_direction_slot = self._output_node.file_slots.get("LightDirection#")
+        light_direction_slot.use_node_format = False
+        light_direction_slot.format.file_format = "OPEN_EXR"
+        light_direction_slot.format.color_mode = "RGB"
+        light_direction_slot.format.exr_codec = "ZIP"
+        light_direction_slot.format.color_depth = "32"
+
         # link nodes
         links = self._tree.links
         links.clear()
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Color#"))
         links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Preview#"))
+        links.new(self._layer_node.outputs.get("Dominant Direction"), self._output_node.inputs.get("LightDirection#"))
 
         rel_path = bpy.path.relpath(output_path)
         self._output_node.base_path = rel_path

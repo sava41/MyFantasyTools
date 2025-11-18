@@ -4,6 +4,7 @@ render_mode unshaded, fog_disabled;
 
 uniform sampler2D color;
 uniform sampler2D depth;
+uniform sampler2D light_direction;
 
 uniform float fov = 1.0;
 uniform float uncropped_fov = 1.0;

@@ -24,7 +24,7 @@ namespace mft
         m_view_info = view_info;
 
         // TODO: for now views have hardcoded channels
-        m_image_type_flags = Color | Depth | Environment;
+        m_image_type_flags = Color | Depth | Environment | LightDirection;
 
         std::string name = view_info->name()->c_str();
 
