@@ -12,9 +12,29 @@ uniform float uncropped_aspect = 1.0;
 uniform mat4 uncropped_view_mat = mat4(1.0);
 
 vec4 sample_zero_outside(sampler2D tex, vec2 uv) {
-	return (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) 
-		? texture(tex, uv) 
+	return (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0)
+		? texture(tex, uv)
 		: vec4(0.0);
+}
+
+// Decode octahedral encoded direction from 2D to 3D
+// Inverse of the encoding algorithm used in Blender compositor
+// Input v is expected to be in [0,1] range (as stored in the texture)
+vec3 decode_octahedral(vec2 v) {
+	// Remap from [0, 1] to [-1, 1]
+	v = v * 2.0 - 1.0;
+
+	vec3 n = vec3(v.x, v.y, 1.0 - abs(v.x) - abs(v.y));
+
+	if (n.z < 0.0) {
+		vec2 wrapped = vec2(
+			(1.0 - abs(v.y)) * sign(v.x),
+			(1.0 - abs(v.x)) * sign(v.y)
+		);
+		n.xy = wrapped;
+	}
+
+	return normalize(n);
 }
 
 void vertex() {
