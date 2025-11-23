@@ -61,39 +61,33 @@ class CompositeManager:
         preview_slot.format.color_depth = "8"
 
         # add light direction slot with RGB EXR format
-        self._output_node.file_slots.new("LightDirection#")
-        light_direction_slot = self._output_node.file_slots.get("LightDirection#")
-        light_direction_slot.use_node_format = False
-        light_direction_slot.format.file_format = "OPEN_EXR"
-        light_direction_slot.format.color_mode = "RGB"
-        light_direction_slot.format.exr_codec = "ZIP"
-        light_direction_slot.format.color_depth = "32"
+        self._output_node.file_output_items.new("RGBA", "LightDirection#")
 
         # Remap the world-space direction vector from [-1, 1] to [0, 1] for storage
         # Formula: output = (input + 1) * 0.5
-        links = self._tree.links
+
+        normalize_node = self._tree.nodes.new(type="ShaderNodeVectorMath")
+        normalize_node.operation = "NORMALIZE"
 
         # Add 1.0 to all channels
-        add_node = self._tree.nodes.new(type="CompositorNodeMath")
-        add_node.blend_type = 'ADD'
-        add_node.inputs[0].default_value = 1.0  # Factor
-        links.new(self._layer_node.outputs.get("Dominant Direction"), add_node.inputs[1])
-        add_node.inputs[2].default_value = (1.0, 1.0, 1.0, 1.0)  # Add 1.0 to each channel
+        add_node = self._tree.nodes.new(type="ShaderNodeVectorMath")
+        add_node.operation = "ADD"
+        add_node.inputs[1].default_value = (1.0, 1.0, 1.0)  # Add 1.0 to each channel
 
         # Multiply by 0.5
-        mul_node = self._tree.nodes.new(type="CompositorNodeMath")
-        mul_node.blend_type = 'MULTIPLY'
-        mul_node.inputs[0].default_value = 1.0  # Factor
-        links.new(add_node.outputs[0], mul_node.inputs[1])
-        mul_node.inputs[2].default_value = (0.5, 0.5, 0.5, 1.0)  # Multiply by 0.5
+        mul_node = self._tree.nodes.new(type="ShaderNodeVectorMath")
+        mul_node.operation = "MULTIPLY"
+        mul_node.inputs[1].default_value = (0.5, 0.5, 0.5)  # Multiply by 0.5
 
         # link nodes
+        links = self._tree.links
         links.clear()
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Color#"))
         links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Preview#"))
-        links.new(self._layer_node.outputs.get("Dominant Direction"), add_node.inputs[1])
-        links.new(add_node.outputs[0], mul_node.inputs[1])
+        links.new(self._layer_node.outputs.get("Dominant Direction"), normalize_node.inputs[0])
+        links.new(normalize_node.outputs[0], add_node.inputs[0])
+        links.new(add_node.outputs[0], mul_node.inputs[0])
         links.new(mul_node.outputs[0], self._output_node.inputs.get("LightDirection#"))
 
         rel_path = bpy.path.relpath(output_path)
