@@ -60,13 +60,32 @@ class CompositeManager:
         light_direction_slot.format.exr_codec = "ZIP"
         light_direction_slot.format.color_depth = "32"
 
-        # link nodes
+        # Remap the world-space direction vector from [-1, 1] to [0, 1] for storage
+        # Formula: output = (input + 1) * 0.5
         links = self._tree.links
+
+        # Add 1.0 to all channels
+        add_node = self._tree.nodes.new(type="CompositorNodeMath")
+        add_node.blend_type = 'ADD'
+        add_node.inputs[0].default_value = 1.0  # Factor
+        links.new(self._layer_node.outputs.get("Dominant Direction"), add_node.inputs[1])
+        add_node.inputs[2].default_value = (1.0, 1.0, 1.0, 1.0)  # Add 1.0 to each channel
+
+        # Multiply by 0.5
+        mul_node = self._tree.nodes.new(type="CompositorNodeMath")
+        mul_node.blend_type = 'MULTIPLY'
+        mul_node.inputs[0].default_value = 1.0  # Factor
+        links.new(add_node.outputs[0], mul_node.inputs[1])
+        mul_node.inputs[2].default_value = (0.5, 0.5, 0.5, 1.0)  # Multiply by 0.5
+
+        # link nodes
         links.clear()
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Color#"))
         links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Preview#"))
-        links.new(self._layer_node.outputs.get("Dominant Direction"), self._output_node.inputs.get("LightDirection#"))
+        links.new(self._layer_node.outputs.get("Dominant Direction"), add_node.inputs[1])
+        links.new(add_node.outputs[0], mul_node.inputs[1])
+        links.new(mul_node.outputs[0], self._output_node.inputs.get("LightDirection#"))
 
         rel_path = bpy.path.relpath(output_path)
         self._output_node.base_path = rel_path

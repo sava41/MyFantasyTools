@@ -12,9 +12,15 @@ uniform float uncropped_aspect = 1.0;
 uniform mat4 uncropped_view_mat = mat4(1.0);
 
 vec4 sample_zero_outside(sampler2D tex, vec2 uv) {
-	return (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0) 
-		? texture(tex, uv) 
+	return (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0)
+		? texture(tex, uv)
 		: vec4(0.0);
+}
+
+// Decode world-space direction vector from [0,1] RGB to [-1,1] range
+// Inverse of encoding: output = input * 2.0 - 1.0
+vec3 decode_direction(vec3 encoded) {
+	return encoded * 2.0 - 1.0;
 }
 
 void vertex() {
