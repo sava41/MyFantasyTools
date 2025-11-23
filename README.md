@@ -6,7 +6,7 @@
 This project is a pipeline for making pre-rendered background games in the style of PS1 Resident Evil and Final Fantasy. The tools are intended as a end-to-end solution from the creation of the backgrounds in Blender to the loading of the data in your game engine of choice.
 
 ## Requiremends
-- Blender 4.0 or later
+- Blender 5.0
 - Python 3.11
 - CMake 3.19 or later
 - C++ compiler

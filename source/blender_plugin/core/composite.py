@@ -5,16 +5,21 @@ class CompositeManager:
     _tree = None
     _layer_node = None
     _output_node = None
-    
-    def __init__(self, scene):
-        
-        # switch on nodes and get reference
-        scene.use_nodes = True
 
+    def __init__(self, scene):
+
+        # Blender 5.0+: Create compositor node tree as a separate data block
         scene.view_layers["ViewLayer"].use_pass_combined = True
         scene.view_layers["ViewLayer"].use_pass_z = True
 
-        self._tree = scene.node_tree
+        # Create new compositor node tree or reuse existing one
+        if scene.compositing_node_group is None:
+            self._tree = bpy.data.node_groups.new("MFT Compositor", "CompositorNodeTree")
+            scene.compositing_node_group = self._tree
+        else:
+            self._tree = scene.compositing_node_group
+
+        # Clear existing nodes
         for node in self._tree.nodes:
             self._tree.nodes.remove(node)
 
@@ -22,7 +27,9 @@ class CompositeManager:
         self._layer_node = self._tree.nodes.new(type="CompositorNodeRLayers")
 
         # create output node
-        self._output_node = self._tree.nodes.new("CompositorNodeOutputFile")
+        self._output_node = self._tree.nodes.new(type="CompositorNodeOutputFile")
+        self._output_node.file_name = ""
+        self._output_node.format.media_type = "IMAGE"
         self._output_node.format.file_format = "OPEN_EXR"
         self._output_node.format.color_mode = "RGB"
         self._output_node.format.exr_codec = "ZIP"
@@ -30,22 +37,24 @@ class CompositeManager:
 
     def set_main_output(self, output_path):
 
-        self._output_node.file_slots.clear()
-        self._output_node.file_slots.new("Color#")
+        self._output_node.file_output_items.clear()
+        self._output_node.file_output_items.new("RGBA", "Color#")
 
         # add depth slot with BW color mode
-        self._output_node.file_slots.new("Depth#")
-        depth_slot = self._output_node.file_slots.get("Depth#")
-        depth_slot.use_node_format = False
+        self._output_node.file_output_items.new("FLOAT", "Depth#")
+        depth_slot = self._output_node.file_output_items.get("Depth#")
+        depth_slot.override_node_format = True
+        depth_slot.format.media_type = "IMAGE"
         depth_slot.format.file_format = "OPEN_EXR"
         depth_slot.format.color_mode = "BW"
         depth_slot.format.exr_codec = "ZIP"
         depth_slot.format.color_depth = "32"
 
         # add preview slot with PNG format
-        self._output_node.file_slots.new("Preview#")
-        preview_slot = self._output_node.file_slots.get("Preview#")
-        preview_slot.use_node_format = False
+        self._output_node.file_output_items.new("RGBA", "Preview#")
+        preview_slot = self._output_node.file_output_items.get("Preview#")
+        preview_slot.override_node_format = True
+        preview_slot.format.media_type = "IMAGE"
         preview_slot.format.file_format = "PNG"
         preview_slot.format.color_mode = "RGB"
         preview_slot.format.color_depth = "8"
@@ -58,14 +67,14 @@ class CompositeManager:
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Preview#"))
 
         rel_path = bpy.path.relpath(output_path)
-        self._output_node.base_path = rel_path
+        self._output_node.directory = rel_path
     
     def set_env_output(self, output_path):
 
-        self._output_node.file_slots.clear()
-        self._output_node.file_slots.new("Environment#")
+        self._output_node.file_output_items.clear()
+        self._output_node.file_output_items.new("RGBA", "Environment#")
 
-        self._output_node.base_path = bpy.path.relpath(output_path)
+        self._output_node.directory = bpy.path.relpath(output_path)
 
         # link nodes
         links = self._tree.links
@@ -73,4 +82,4 @@ class CompositeManager:
         links.new(self._layer_node.outputs.get("Image"), self._output_node.inputs.get("Environment#"))
 
         rel_path = bpy.path.relpath(output_path)
-        self._output_node.base_path = rel_path
+        self._output_node.directory = rel_path
