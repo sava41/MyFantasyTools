@@ -18,6 +18,7 @@ class View:
           return members[index + 1] if index + 1 < len(members) else None
 
     _main_camera = None
+    _camera_name = ""
     _env_camera = None
     _env_camera_obj = None
     _res_x = 1920
@@ -45,6 +46,7 @@ class View:
         
         camera = object.camera
 
+        self._camera_name = camera.name
         self._main_camera = camera.copy()
         self._main_camera.data = camera.data.copy()
         self._aspect = float(self._res_y) / float(self._res_x)
