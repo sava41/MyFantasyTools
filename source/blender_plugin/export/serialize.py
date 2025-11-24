@@ -25,7 +25,7 @@ def serialize_level(navmesh, views) -> bytearray:
     serialized_views = list()
     for view in views:
 
-        name = builder.CreateString(view._main_camera.name)
+        name = builder.CreateString(view._name)
 
         View.StartAdjacentViewsVector(builder, len(view._adjacent_views))
         for adj_view in view._adjacent_views:

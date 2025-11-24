@@ -1,12 +1,12 @@
-#include "view_data.h"
-#include "view_level_manager.h"
+#include "mf_view_level_manager.h"
+#include "mf_view_resources.h"
 
 #include <stdio.h>
 
-class ViewDataSimple : public mft::ViewData
+class ViewResourcesSimple : public mft::ViewResources
 {
   public:
-    bool load_camera_data( const std::array<float, MAT4_SIZE>& transform, int sizex, int sizey, float fov ) override
+    bool load_camera_data() override
     {
         // Do nothing
         return true;
@@ -25,7 +25,11 @@ class ViewDataSimple : public mft::ViewData
         case mft::ViewResources::Environment:
             m_env.resize( buffer_size );
             return m_env.data();
+        case mft::ViewResources::LightDirection:
+            m_light_dir.resize( buffer_size );
+            return m_light_dir.data();
         }
+
 
         return nullptr;
     }
@@ -35,12 +39,14 @@ class ViewDataSimple : public mft::ViewData
         m_color.clear();
         m_depth.clear();
         m_env.clear();
+        m_light_dir.clear();
     }
 
   private:
     std::vector<char> m_color;
     std::vector<char> m_depth;
     std::vector<char> m_env;
+    std::vector<char> m_light_dir;
 };
 
 int main( int argc, char* argv[] )
@@ -51,7 +57,7 @@ int main( int argc, char* argv[] )
         return 1;
     }
 
-    mft::ViewLevelManager<ViewDataSimple> manager;
+    mft::ViewLevelManager<ViewResourcesSimple> manager;
     if( !manager.load_data( argv[1] ) )
     {
         return 1;
