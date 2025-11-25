@@ -5,11 +5,17 @@ render_mode unshaded, fog_disabled;
 uniform sampler2D color;
 uniform sampler2D depth;
 uniform sampler2D light_direction;
+uniform sampler2D depth_buffer : hint_depth_texture;
 
 uniform float fov = 1.0;
 uniform float uncropped_fov = 1.0;
 uniform float uncropped_aspect = 1.0;
 uniform mat4 uncropped_view_mat = mat4(1.0);
+
+// Raymarching parameters
+uniform int ray_steps : hint_range(1, 64) = 16;
+uniform float ray_max_distance = 3;
+uniform float ray_thickness = 0.1;
 
 vec4 sample_zero_outside(sampler2D tex, vec2 uv) {
 	return (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0)
@@ -19,8 +25,67 @@ vec4 sample_zero_outside(sampler2D tex, vec2 uv) {
 
 // Decode world-space direction vector from [0,1] RGB to [-1,1] range
 // Inverse of encoding: output = input * 2.0 - 1.0
+// Also converts from Blender (Z-up) to Godot (Y-up) coordinate system
 vec3 decode_direction(vec3 encoded) {
-	return encoded * 2.0 - 1.0;
+	vec3 dir = encoded * 2.0 - 1.0;
+	// Blender: X right, Y forward, Z up
+	// Godot:   X right, Y up, Z back
+	return vec3(dir.x, dir.z, -dir.y);
+}
+
+// Raymarch along light direction and check for depth buffer intersection
+float raymarch_shadow(
+	vec3 origin,
+	vec3 light_dir,
+	mat4 view_mat,
+	mat4 proj_mat,
+	mat4 inv_proj,
+	mat4 inv_view
+) {
+	float step_size = ray_max_distance / float(ray_steps);
+
+	for (int i = 1; i <= ray_steps; i++) {
+		// Step along the light direction
+		vec3 ray_pos = origin - light_dir * step_size * float(i);
+
+		// Project to screen space
+		vec4 clip_pos = proj_mat * view_mat * vec4(ray_pos, 1.0);
+
+		// Skip if behind camera
+		if (-clip_pos.w <= 0.0) {
+			continue;
+		}
+
+		clip_pos.xyz /= clip_pos.w;
+		vec2 ray_screen_uv = clip_pos.xy * 0.5 + 0.5;
+
+		// Skip if outside screen
+		if (ray_screen_uv.x < 0.0 || ray_screen_uv.x > 1.0 || ray_screen_uv.y < 0.0 || ray_screen_uv.y > 1.0) {
+			continue;
+		}
+
+		// Sample depth buffer
+		float buffer_depth = texture(depth_buffer, ray_screen_uv).x;
+
+		// Reconstruct world position from depth buffer
+		vec3 buffer_ndc = vec3(clip_pos.xy, buffer_depth);
+		vec4 buffer_view = inv_proj * vec4(buffer_ndc, 1.0);
+		buffer_view.xyz /= buffer_view.w;
+		float scene_depth = -buffer_view.z;
+
+		// Compare depths in view space
+		vec4 ray_view = view_mat * vec4(ray_pos, 1.0);
+		ray_view.xyz /= ray_view.w;
+		float ray_depth = ray_view.z;
+
+		// Check if ray is occluded by depth buffer
+		// Ray is behind the scene surface (within thickness tolerance)
+		if (ray_depth > scene_depth && ray_depth < scene_depth + ray_thickness) {
+			return 1.0;
+		}
+	}
+
+	return 0.0; // Not shadowed
 }
 
 void vertex() {
@@ -51,10 +116,6 @@ void fragment() {
 
 	vec2 uncropped_uv = ndc_uncropped * 0.5 + 0.5;
 
-	// Sample texture and clamp to black outside of 0-1 range
-	
-	ALBEDO.rgb = sample_zero_outside(color, uncropped_uv).rgb;
-
 	// Reproject depth to cropped projection space
 	
 	float linear_depth_uncropped = texture(depth, uncropped_uv).r;
@@ -68,4 +129,22 @@ void fragment() {
 	vec4 clip_pos = PROJECTION_MATRIX * VIEW_MATRIX * world_depth_point;
 	clip_pos.xyz /= clip_pos.w;
 	DEPTH = -clip_pos.z;
+
+	// Sample and decode light direction
+	vec3 light_world_direction = decode_direction(texture(light_direction, uncropped_uv).rgb);
+
+	// Raymarch shadow
+	float shadow = raymarch_shadow(
+		world_depth_point.xyz,
+		light_world_direction,
+		VIEW_MATRIX,
+		PROJECTION_MATRIX,
+		INV_PROJECTION_MATRIX,
+		INV_VIEW_MATRIX
+	);
+
+	// Sample texture and clamp to black outside of 0-1 uv range
+	vec3 sampled_color = sample_zero_outside(color, uncropped_uv).rgb;
+	//ALBEDO.rgb = vec3(1.0 - shadow * 0.5);
+	ALBEDO.rgb = sampled_color * vec3(1.0 - shadow);
 }
