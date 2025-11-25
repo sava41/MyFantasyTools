@@ -12,6 +12,7 @@ class CompositeManager:
         scene.view_layers["ViewLayer"].use_pass_combined = True
         scene.view_layers["ViewLayer"].use_pass_z = True
         scene.view_layers["ViewLayer"].use_pass_dominant_direction = True
+        scene.view_layers["ViewLayer"].use_pass_normal = True
 
         # Create new compositor node tree or reuse existing one
         if scene.compositing_node_group is None:
@@ -79,6 +80,9 @@ class CompositeManager:
         mul_node.operation = "MULTIPLY"
         mul_node.inputs[1].default_value = (0.5, 0.5, 0.5)  # Multiply by 0.5
 
+        denoise_node = self._tree.nodes.new(type="CompositorNodeDenoise")
+
+
         # link nodes
         links = self._tree.links
         links.clear()
@@ -88,7 +92,9 @@ class CompositeManager:
         links.new(self._layer_node.outputs.get("Dominant Direction"), normalize_node.inputs[0])
         links.new(normalize_node.outputs[0], add_node.inputs[0])
         links.new(add_node.outputs[0], mul_node.inputs[0])
-        links.new(mul_node.outputs[0], self._output_node.inputs.get("LightDirection#"))
+        links.new(mul_node.outputs[0], denoise_node.inputs[0])
+        links.new(self._layer_node.outputs.get("Normal"), denoise_node.inputs[2])
+        links.new(denoise_node.outputs[0], self._output_node.inputs.get("LightDirection#"))
 
         rel_path = bpy.path.relpath(output_path)
         self._output_node.directory = rel_path
