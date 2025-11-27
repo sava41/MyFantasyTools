@@ -30,13 +30,13 @@ vec3 decode_direction(vec3 encoded) {
 	vec3 dir = encoded * 2.0 - 1.0;
 	// Blender: X right, Y forward, Z up
 	// Godot:   X right, Y up, Z back
-	return vec3(dir.x, dir.z, -dir.y);
+	return -vec3(dir.x, dir.z, -dir.y);
 }
 
 // Raymarch along light direction and check for depth buffer intersection
 float raymarch_shadow(
-	vec3 origin,
-	vec3 light_dir,
+	vec3 view_origin,
+	vec3 world_light_dir,
 	mat4 view_mat,
 	mat4 proj_mat,
 	mat4 inv_proj,
@@ -44,12 +44,14 @@ float raymarch_shadow(
 ) {
 	float step_size = ray_max_distance / float(ray_steps);
 
+	vec3 view_dir = mat3(view_mat) * world_light_dir;
+
 	for (int i = 1; i <= ray_steps; i++) {
 		// Step along the light direction
-		vec3 ray_pos = origin - light_dir * step_size * float(i);
+		vec3 ray_view = view_origin.xyz + view_dir * step_size * float(i);
 
 		// Project to screen space
-		vec4 clip_pos = proj_mat * view_mat * vec4(ray_pos, 1.0);
+		vec4 clip_pos = proj_mat * vec4(ray_view, 1.0);
 
 		// Skip if behind camera
 		if (-clip_pos.w <= 0.0) {
@@ -71,12 +73,10 @@ float raymarch_shadow(
 		vec3 buffer_ndc = vec3(clip_pos.xy, buffer_depth);
 		vec4 buffer_view = inv_proj * vec4(buffer_ndc, 1.0);
 		buffer_view.xyz /= buffer_view.w;
-		float scene_depth = -buffer_view.z;
 
 		// Compare depths in view space
-		vec4 ray_view = view_mat * vec4(ray_pos, 1.0);
-		ray_view.xyz /= ray_view.w;
 		float ray_depth = ray_view.z;
+		float scene_depth = -buffer_view.z;
 
 		// Check if ray is occluded by depth buffer
 		// Ray is behind the scene surface (within thickness tolerance)
@@ -126,7 +126,11 @@ void fragment() {
 	world_depth_point.xyz /= world_depth_point.w;
 	world_depth_point.w = 1.0;
 
-	vec4 clip_pos = PROJECTION_MATRIX * VIEW_MATRIX * world_depth_point;
+	vec4 view_depth_point = VIEW_MATRIX * world_depth_point;
+	view_depth_point.xyz /= view_depth_point.w;
+	view_depth_point.w = 1.0;
+
+	vec4 clip_pos = PROJECTION_MATRIX * view_depth_point;
 	clip_pos.xyz /= clip_pos.w;
 	DEPTH = -clip_pos.z;
 
@@ -135,7 +139,7 @@ void fragment() {
 
 	// Raymarch shadow
 	float shadow = raymarch_shadow(
-		world_depth_point.xyz,
+		view_depth_point.xyz,
 		light_world_direction,
 		VIEW_MATRIX,
 		PROJECTION_MATRIX,
