@@ -17,10 +17,100 @@ uniform int ray_steps : hint_range(1, 64) = 16;
 uniform float ray_max_distance = 3;
 uniform float ray_thickness = 0.1;
 
+const uint sectorCount = 32u;
+uniform float sampleCount = 6;
+uniform float sampleRadius = 0.4;
+uniform float sliceCount = 6;
+uniform float hitThickness = 0.5;
+
+const float pi = 3.14159265359;
+const float twoPi = 2.0 * pi;
+const float halfPi = 0.5 * pi;
+
+// https://blog.demofox.org/2022/01/01/interleaved-gradient-noise-a-different-kind-of-low-discrepancy-sequence/
+float randf(int x, int y) {
+    return mod(52.9829189 * mod(0.06711056 * float(x) + 0.00583715 * float(y), 1.0), 1.0);
+}
+
+// https://graphics.stanford.edu/%7Eseander/bithacks.html
+uint bit_count(uint value) {
+    value = value - ((value >> 1u) & 0x55555555u);
+    value = (value & 0x33333333u) + ((value >> 2u) & 0x33333333u);
+    return ((value + (value >> 4u) & 0xF0F0F0Fu) * 0x1010101u) >> 24u;
+}
+
+// https://cdrinmatane.github.io/posts/ssaovb-code/
+uint update_sectors(float minHorizon, float maxHorizon, uint outBitfield) {
+    uint startBit = uint(minHorizon * float(sectorCount));
+    uint horizonAngle = uint(ceil((maxHorizon - minHorizon) * float(sectorCount)));
+    uint angleBit = horizonAngle > 0u ? uint(0xFFFFFFFFu >> (sectorCount - horizonAngle)) : 0u;
+    uint currentBitfield = angleBit << startBit;
+    return outBitfield | currentBitfield;
+}
+
 vec4 sample_zero_outside(sampler2D tex, vec2 uv) {
 	return (uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0)
 		? texture(tex, uv)
 		: vec4(0.0);
+}
+
+// ao algo based on GTVBAO
+float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_origin, vec3 view_normal, mat4 proj, mat4 inv_proj, float jitter) {
+    uint indirect = 0u;
+    uint occlusion = 0u;
+
+    float visibility = 0.0;
+    vec2 frontBackHorizon = vec2(0.0);
+    vec3 view_dir = normalize(-view_origin);
+
+	float sliceRotation = pi / float(sliceCount - 1.0);
+    float sampleScale = (-sampleRadius * proj[0][0]) / view_origin.z;
+    float sampleOffset = 0.01;
+
+	return sampleScale;
+
+    for (float slice = 0.0; slice < sliceCount + 0.5; slice += 1.0) {
+        float phi = sliceRotation * (slice + jitter) + pi;
+        vec2 omega = vec2(cos(phi), sin(phi));
+        vec3 direction = vec3(omega.x, omega.y, 0.0);
+        vec3 orthoDirection = direction - dot(direction, view_dir) * view_dir;
+        vec3 axis = cross(direction, view_dir);
+        vec3 projNormal = view_normal - axis * dot(view_normal, axis);
+        float projLength = length(projNormal);
+
+        float signN = sign(dot(orthoDirection, projNormal));
+        float cosN = clamp(dot(projNormal, view_dir) / projLength, 0.0, 1.0);
+        float n = signN * acos(cosN);
+
+        for (float currentSample = 0.0; currentSample < sampleCount + 0.5; currentSample += 1.0) {
+            float sampleStep = (currentSample + jitter) / sampleCount + sampleOffset;
+            vec2 sampleUV = screen_uv - sampleStep * sampleScale * omega * aspect;
+            
+			float depth_sample = texture(depth_buffer, sampleUV).x;
+
+			vec3 buffer_ndc = vec3(sampleUV * 2.0 - 1.0, depth_sample);
+			vec4 buffer_view = inv_proj * vec4(buffer_ndc, 1.0);
+			buffer_view.xyz /= buffer_view.w;
+			
+            vec3 sampleDistance = view_origin - buffer_view.xyz;
+            float sampleLength = length(sampleDistance);
+            vec3 sampleHorizon = sampleDistance / sampleLength;
+
+            frontBackHorizon.x = dot(sampleHorizon, view_dir);
+            frontBackHorizon.y = dot(normalize(sampleDistance - view_dir * hitThickness), view_dir);
+
+            frontBackHorizon = acos(frontBackHorizon);
+            frontBackHorizon = clamp((frontBackHorizon + n + halfPi) / pi, 0.0, 1.0);
+
+            indirect = update_sectors(frontBackHorizon.x, frontBackHorizon.y, 0u);
+            occlusion |= indirect;
+        }
+        visibility += 1.0 - float(bit_count(occlusion)) / float(sectorCount);
+    }
+
+    visibility /= sliceCount;
+
+    return visibility;
 }
 
 // Decode world-space direction vector from [0,1] RGB to [-1,1] range
@@ -118,7 +208,7 @@ void fragment() {
 
 	// Reproject depth to cropped projection space
 	
-	float linear_depth_uncropped = texture(depth, uncropped_uv).r;
+	float linear_depth_uncropped = texture(depth, uncropped_uv).x;
 
 	vec3 uncropped_view_depth_point = view_dir_uncropped * (linear_depth_uncropped / view_dir_uncropped.z);
 
@@ -147,8 +237,17 @@ void fragment() {
 		INV_VIEW_MATRIX
 	);
 
+	vec2 aspect = VIEWPORT_SIZE.yx / VIEWPORT_SIZE.x;
+	float jitter = randf(int(FRAGCOORD.x), int(FRAGCOORD.y)) - 0.5;
+	
+	vec3 view_point_ddx = dFdx(view_depth_point.xyz);
+	vec3 view_point_ddy = dFdy(view_depth_point.xyz);
+	vec3 point_normal = normalize(cross(view_point_ddx, -view_point_ddy));
+
+	float ao = get_ao(SCREEN_UV, aspect, view_depth_point.xyz, point_normal, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, jitter);
+
 	// Sample texture and clamp to black outside of 0-1 uv range
 	vec3 sampled_color = sample_zero_outside(color, uncropped_uv).rgb;
-	//ALBEDO.rgb = vec3(1.0 - shadow * 0.5);
-	ALBEDO.rgb = sampled_color * vec3(1.0 - shadow);
+	ALBEDO.rgb = vec3(ao);
+	//ALBEDO.rgb = sampled_color * vec3(1.0 - shadow);
 }
