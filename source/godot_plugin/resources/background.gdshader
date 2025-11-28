@@ -19,9 +19,9 @@ uniform float ray_thickness = 0.1;
 
 const uint sectorCount = 32u;
 uniform float sampleCount = 6;
-uniform float sampleRadius = 0.4;
+uniform float sampleRadius = 2.0;
 uniform float sliceCount = 6;
-uniform float hitThickness = 0.5;
+uniform float hitThickness = 0.3;
 
 const float pi = 3.14159265359;
 const float twoPi = 2.0 * pi;
@@ -56,19 +56,14 @@ vec4 sample_zero_outside(sampler2D tex, vec2 uv) {
 
 // ao algo based on GTVBAO
 float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_origin, vec3 view_normal, mat4 proj, mat4 inv_proj, float jitter) {
-    uint indirect = 0u;
-    uint occlusion = 0u;
 
-    float visibility = 0.0;
-    vec2 frontBackHorizon = vec2(0.0);
     vec3 view_dir = normalize(-view_origin);
 
 	float sliceRotation = pi / float(sliceCount - 1.0);
     float sampleScale = (-sampleRadius * proj[0][0]) / view_origin.z;
     float sampleOffset = 0.01;
-
-	return sampleScale;
-
+    
+	float visibility = 0.0;
     for (float slice = 0.0; slice < sliceCount + 0.5; slice += 1.0) {
         float phi = sliceRotation * (slice + jitter) + pi;
         vec2 omega = vec2(cos(phi), sin(phi));
@@ -82,30 +77,44 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_origin, vec3 view_normal, ma
         float cosN = clamp(dot(projNormal, view_dir) / projLength, 0.0, 1.0);
         float n = signN * acos(cosN);
 
+		uint sector_bitmask = 0u;
+
         for (float currentSample = 0.0; currentSample < sampleCount + 0.5; currentSample += 1.0) {
             float sampleStep = (currentSample + jitter) / sampleCount + sampleOffset;
             vec2 sampleUV = screen_uv - sampleStep * sampleScale * omega * aspect;
+
+			// Skip if outside screen
+			if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0) {
+				continue;
+			}
             
 			float depth_sample = texture(depth_buffer, sampleUV).x;
 
-			vec3 buffer_ndc = vec3(sampleUV * 2.0 - 1.0, depth_sample);
-			vec4 buffer_view = inv_proj * vec4(buffer_ndc, 1.0);
+			vec4 buffer_ndc = vec4(sampleUV * 2.0 - 1.0, depth_sample, 1.0);
+			vec4 buffer_view = inv_proj * buffer_ndc;
 			buffer_view.xyz /= buffer_view.w;
 			
-            vec3 sampleDistance = view_origin - buffer_view.xyz;
+            vec3 sampleDistance = buffer_view.xyz - view_origin;
             float sampleLength = length(sampleDistance);
+
             vec3 sampleHorizon = sampleDistance / sampleLength;
 
+			// Skip samples in the back hemisphere (angle with normal > 90 degrees)
+			if (dot(sampleHorizon, view_normal) < 0.0) {
+				continue;
+			}
+
+			vec2 frontBackHorizon = vec2(0.0);
             frontBackHorizon.x = dot(sampleHorizon, view_dir);
             frontBackHorizon.y = dot(normalize(sampleDistance - view_dir * hitThickness), view_dir);
 
             frontBackHorizon = acos(frontBackHorizon);
             frontBackHorizon = clamp((frontBackHorizon + n + halfPi) / pi, 0.0, 1.0);
 
-            indirect = update_sectors(frontBackHorizon.x, frontBackHorizon.y, 0u);
-            occlusion |= indirect;
+            sector_bitmask = update_sectors(frontBackHorizon.x, frontBackHorizon.y, sector_bitmask);
         }
-        visibility += 1.0 - float(bit_count(occlusion)) / float(sectorCount);
+
+        visibility += 1.0 - float(bit_count(sector_bitmask)) / float(sectorCount);
     }
 
     visibility /= sliceCount;
@@ -120,31 +129,27 @@ vec3 decode_direction(vec3 encoded) {
 	vec3 dir = encoded * 2.0 - 1.0;
 	// Blender: X right, Y forward, Z up
 	// Godot:   X right, Y up, Z back
-	return -vec3(dir.x, dir.z, -dir.y);
+	return vec3(dir.x, dir.z, -dir.y);
 }
 
 // Raymarch along light direction and check for depth buffer intersection
 float raymarch_shadow(
 	vec3 view_origin,
-	vec3 world_light_dir,
-	mat4 view_mat,
+	vec3 view_light_dir,
 	mat4 proj_mat,
-	mat4 inv_proj,
-	mat4 inv_view
+	mat4 inv_proj_mat
 ) {
 	float step_size = ray_max_distance / float(ray_steps);
 
-	vec3 view_dir = mat3(view_mat) * world_light_dir;
-
 	for (int i = 1; i <= ray_steps; i++) {
 		// Step along the light direction
-		vec3 ray_view = view_origin.xyz + view_dir * step_size * float(i);
+		vec3 ray_view = view_origin + view_light_dir * step_size * float(i);
 
 		// Project to screen space
 		vec4 clip_pos = proj_mat * vec4(ray_view, 1.0);
 
 		// Skip if behind camera
-		if (-clip_pos.w <= 0.0) {
+		if (clip_pos.w <= 0.0) {
 			continue;
 		}
 
@@ -160,17 +165,17 @@ float raymarch_shadow(
 		float buffer_depth = texture(depth_buffer, ray_screen_uv).x;
 
 		// Reconstruct world position from depth buffer
-		vec3 buffer_ndc = vec3(clip_pos.xy, buffer_depth);
-		vec4 buffer_view = inv_proj * vec4(buffer_ndc, 1.0);
+		vec4 buffer_ndc = vec4(clip_pos.xy, buffer_depth, 1.0);
+		vec4 buffer_view = inv_proj_mat * buffer_ndc;
 		buffer_view.xyz /= buffer_view.w;
 
 		// Compare depths in view space
 		float ray_depth = ray_view.z;
-		float scene_depth = -buffer_view.z;
+		float scene_depth = buffer_view.z;
 
 		// Check if ray is occluded by depth buffer
 		// Ray is behind the scene surface (within thickness tolerance)
-		if (ray_depth > scene_depth && ray_depth < scene_depth + ray_thickness) {
+		if (ray_depth < scene_depth && ray_depth > scene_depth - ray_thickness) {
 			return 1.0;
 		}
 	}
@@ -186,9 +191,9 @@ void fragment() {
 
 	// Reproject uvs to uncropped uv space
 
-	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, 1.0);
+	vec4 ndc = vec4(SCREEN_UV * 2.0 - 1.0, 1.0, 1.0);
 
-	vec4 world_view_point = INV_VIEW_MATRIX * INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
+	vec4 world_view_point = INV_VIEW_MATRIX * INV_PROJECTION_MATRIX * ndc;
   	world_view_point.xyz /= world_view_point.w;
 	world_view_point.w = 1.0;
 
@@ -204,50 +209,61 @@ void fragment() {
 	// The x axis is flipped, not sure why
 	ndc_uncropped.x = -ndc_uncropped.x;
 
-	vec2 uncropped_uv = ndc_uncropped * 0.5 + 0.5;
+	vec2 screen_uv_uncropped = ndc_uncropped * 0.5 + 0.5;
 
 	// Reproject depth to cropped projection space
 	
-	float linear_depth_uncropped = texture(depth, uncropped_uv).x;
+	float linear_depth_uncropped = texture(depth, screen_uv_uncropped).x;
 
-	vec3 uncropped_view_depth_point = view_dir_uncropped * (linear_depth_uncropped / view_dir_uncropped.z);
+	vec3 uncropped_view_depth_pos = -view_dir_uncropped * (linear_depth_uncropped / view_dir_uncropped.z);
 
-	vec4 world_depth_point = uncropped_view_mat * vec4(uncropped_view_depth_point, 1.0);
+	vec4 world_depth_point = uncropped_view_mat * vec4(uncropped_view_depth_pos, 1.0);
 	world_depth_point.xyz /= world_depth_point.w;
 	world_depth_point.w = 1.0;
 
-	vec4 view_depth_point = VIEW_MATRIX * world_depth_point;
-	view_depth_point.xyz /= view_depth_point.w;
-	view_depth_point.w = 1.0;
+	vec4 view_depth_pos = VIEW_MATRIX * world_depth_point;
+	view_depth_pos.xyz /= view_depth_pos.w;
+	view_depth_pos.w = 1.0;
 
-	vec4 clip_pos = PROJECTION_MATRIX * view_depth_point;
+	vec4 clip_pos = PROJECTION_MATRIX * view_depth_pos;
 	clip_pos.xyz /= clip_pos.w;
-	DEPTH = -clip_pos.z;
+	DEPTH = clip_pos.z;
 
 	// Sample and decode light direction
-	vec3 light_world_direction = decode_direction(texture(light_direction, uncropped_uv).rgb);
+	vec3 light_world_dir = decode_direction(texture(light_direction, screen_uv_uncropped).rgb);
+
+	vec3 light_view_dir = mat3(VIEW_MATRIX) * light_world_dir;
 
 	// Raymarch shadow
 	float shadow = raymarch_shadow(
-		view_depth_point.xyz,
-		light_world_direction,
-		VIEW_MATRIX,
+		view_depth_pos.xyz,
+		light_view_dir,
 		PROJECTION_MATRIX,
-		INV_PROJECTION_MATRIX,
-		INV_VIEW_MATRIX
+		INV_PROJECTION_MATRIX
 	);
+
+	//we need to comp the depth buffer and the depth texture before we calculate ao
+	float buffer_depth = texture(depth_buffer, SCREEN_UV).x;
+
+	if(buffer_depth > clip_pos.z)
+	{
+		vec4 buffer_ndc = vec4(SCREEN_UV * 2.0 - 1.0, buffer_depth, 1.0);
+		vec4 buffer_view = INV_PROJECTION_MATRIX * buffer_ndc;
+		buffer_view.xyz /= buffer_view.w;
+
+		view_depth_pos.xyz = buffer_view.xyz;
+	}
+
+	vec3 view_point_ddx = dFdx(view_depth_pos.xyz);
+	vec3 view_point_ddy = dFdy(view_depth_pos.xyz);
+	vec3 point_normal = normalize(cross(view_point_ddx, -view_point_ddy));
 
 	vec2 aspect = VIEWPORT_SIZE.yx / VIEWPORT_SIZE.x;
 	float jitter = randf(int(FRAGCOORD.x), int(FRAGCOORD.y)) - 0.5;
-	
-	vec3 view_point_ddx = dFdx(view_depth_point.xyz);
-	vec3 view_point_ddy = dFdy(view_depth_point.xyz);
-	vec3 point_normal = normalize(cross(view_point_ddx, -view_point_ddy));
-
-	float ao = get_ao(SCREEN_UV, aspect, view_depth_point.xyz, point_normal, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, jitter);
+	float ao = get_ao(SCREEN_UV, aspect, view_depth_pos.xyz, point_normal, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, jitter);
 
 	// Sample texture and clamp to black outside of 0-1 uv range
-	vec3 sampled_color = sample_zero_outside(color, uncropped_uv).rgb;
-	ALBEDO.rgb = vec3(ao);
-	//ALBEDO.rgb = sampled_color * vec3(1.0 - shadow);
+	vec3 sampled_color = sample_zero_outside(color, screen_uv_uncropped).rgb;
+	
+	ALBEDO.rgb = sampled_color * vec3(1.0 - shadow * 0.7) * ao * ao * ao * ao;
 }
