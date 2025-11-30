@@ -17,7 +17,8 @@ class GDViewResources : public mft::ViewResources
 
     godot::Transform3D m_transform;
 
-    godot::Ref<godot::Image> m_colorBuffer;
+    godot::Ref<godot::Image> m_colorDirectBuffer;
+    godot::Ref<godot::Image> m_colorIndirectBuffer;
     godot::Ref<godot::Image> m_depthBuffer;
     godot::Ref<godot::Image> m_envBuffer;
     godot::Ref<godot::Image> m_lightDirectionBuffer;

@@ -28,9 +28,13 @@ void* GDViewResources::create_image_buffer( int sizex, int sizey, int channels, 
 
     switch( type )
     {
-    case ImageType::Color:
-        m_colorBuffer = godot::Image::create( sizex, sizey, false, godot::Image::FORMAT_RGBF );
-        return const_cast<uint8_t*>( m_colorBuffer->get_data().ptr() );
+    case ImageType::ColorDirect:
+        m_colorDirectBuffer = godot::Image::create( sizex, sizey, false, godot::Image::FORMAT_RGBF );
+        return const_cast<uint8_t*>( m_colorDirectBuffer->get_data().ptr() );
+
+    case ImageType::ColorIndirect:
+        m_colorIndirectBuffer = godot::Image::create( sizex, sizey, false, godot::Image::FORMAT_RGBF );
+        return const_cast<uint8_t*>( m_colorIndirectBuffer->get_data().ptr() );
 
     case ImageType::Depth:
         m_depthBuffer = godot::Image::create( sizex, sizey, false, godot::Image::FORMAT_RF );

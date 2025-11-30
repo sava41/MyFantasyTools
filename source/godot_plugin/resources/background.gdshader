@@ -2,7 +2,8 @@ shader_type spatial;
 
 render_mode unshaded, fog_disabled;
 
-uniform sampler2D color;
+uniform sampler2D color_direct;
+uniform sampler2D color_indirect;
 uniform sampler2D depth;
 uniform sampler2D light_direction;
 uniform sampler2D depth_buffer : hint_depth_texture;
@@ -188,11 +189,11 @@ float raymarch_shadow(
 		// Check if ray is occluded by depth buffer
 		// Ray is behind the scene surface (within thickness tolerance)
 		if (ray_depth < scene_depth && ray_depth > scene_depth - ray_thickness) {
-			return 1.0;
+			return 0.0;
 		}
 	}
 
-	return 0.0; // Not shadowed
+	return 1.0; // Not shadowed
 }
 
 void vertex() {
@@ -239,7 +240,7 @@ void fragment() {
 
 	vec4 clip_pos = PROJECTION_MATRIX * view_depth_pos;
 	clip_pos.xyz /= clip_pos.w;
-	DEPTH = 1.0;//clip_pos.z;
+	DEPTH = clip_pos.z;
 
 	// Sample and decode light direction
 	vec3 light_world_dir = decode_direction(texture(light_direction, screen_uv_uncropped).rgb);
@@ -275,7 +276,8 @@ void fragment() {
 	float ao = get_ao(SCREEN_UV, aspect, view_depth_pos.xyz, view_point_normal, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, jitter);
 
 	// Sample texture and clamp to black outside of 0-1 uv range
-	vec3 sampled_color = sample_zero_outside(color, screen_uv_uncropped).rgb;
+	vec3 sampled_color_direct = sample_zero_outside(color_direct, screen_uv_uncropped).rgb;
+	vec3 sampled_color_indirect = sample_zero_outside(color_indirect, screen_uv_uncropped).rgb;
 	
-	ALBEDO.rgb = vec3(ao);//sampled_color * vec3(1.0 - shadow * 0.7) * ao;
+	ALBEDO.rgb = sampled_color_direct * shadow + sampled_color_indirect * ao;
 }

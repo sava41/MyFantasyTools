@@ -16,9 +16,11 @@ class ViewResourcesSimple : public mft::ViewResources
     {
         switch( type )
         {
-        case mft::ViewResources::Color:
+        case mft::ViewResources::ColorDirect:
             m_color.resize( buffer_size );
             return m_color.data();
+        case mft::ViewResources::ColorIndirect:
+            return nullptr;
         case mft::ViewResources::Depth:
             m_depth.resize( buffer_size );
             return m_depth.data();

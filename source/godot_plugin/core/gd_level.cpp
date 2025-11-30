@@ -170,7 +170,8 @@ bool MFLevel::set_view( int view_id )
 
     const std::unique_ptr<GDViewResources>& view_resources = MFManager::get()->get_view_data( view_id );
 
-    m_backgroundMaterial->set_shader_parameter( "color", godot::ImageTexture::create_from_image( view_resources->m_colorBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "color_direct", godot::ImageTexture::create_from_image( view_resources->m_colorDirectBuffer ) );
+    m_backgroundMaterial->set_shader_parameter( "color_indirect", godot::ImageTexture::create_from_image( view_resources->m_colorIndirectBuffer ) );
     m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_resources->m_depthBuffer ) );
     m_backgroundMaterial->set_shader_parameter( "light_direction", godot::ImageTexture::create_from_image( view_resources->m_lightDirectionBuffer ) );
 
