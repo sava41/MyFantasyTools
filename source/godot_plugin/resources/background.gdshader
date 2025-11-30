@@ -63,15 +63,14 @@ float fast_acos(float x) {
 	return (-0.69813170*x*x - 0.87266463)*x + 1.57079633;
 }
 
-uint trace_slice(vec2 screen_uv, vec2 ray_dir, float jitter, float sample_scale, vec2 aspect, float n, vec3 view_dir, vec3 view_origin, vec3 view_normal, mat4 inv_proj) {
+uint trace_slice(float d_sign, vec2 uv_sample_start, vec2 uv_sample_step, float n, vec3 view_dir, vec3 view_origin, vec3 view_normal, mat4 inv_proj) {
 	uint sector_bitmask = 0u;
 
-	float sample_step = 1.0 / float(sampleCount) * sample_scale;
-	float sample_offset = (jitter / float(sampleCount) + sampleOffset) * sample_scale;
+	vec2 uv_sample = uv_sample_start;
 	
 	for (int i = 0; i < sampleCount; i++) {
 
-		vec2 sampleUV = clamp(screen_uv - sample_offset * ray_dir * aspect, vec2(0.0), vec2(1.0));
+		vec2 sampleUV = clamp(uv_sample, vec2(0.0), vec2(1.0));
 		
 		float depth_sample = texture(depth_buffer, sampleUV).x;
 
@@ -89,11 +88,12 @@ uint trace_slice(vec2 screen_uv, vec2 ray_dir, float jitter, float sample_scale,
 		frontBackHorizon.y = dot(normalize(sampleDistance - view_dir * hitThickness), view_dir);
 
 		frontBackHorizon = fast_acos2(frontBackHorizon);
-		frontBackHorizon = clamp((frontBackHorizon + n + halfPi) / pi, 0.0, 1.0);
+		frontBackHorizon = clamp((d_sign * -frontBackHorizon - n + halfPi) / pi, 0.0, 1.0);
+		frontBackHorizon = d_sign > 0.0 ? frontBackHorizon.yx : frontBackHorizon.xy;
 
 		sector_bitmask = update_sectors(frontBackHorizon.x, frontBackHorizon.y, sector_bitmask);
 
-		sample_offset += sample_step;
+		uv_sample += uv_sample_step;
 	}
 
 	return sector_bitmask;
@@ -122,17 +122,18 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_origin, vec3 view_normal, ma
         float signN = sign(dot(orthoDirection, projNormal));
         float n = signN * fast_acos(cosN);
 
-		uint sector_bitmask = trace_slice(screen_uv, omega, jitter, sample_scale, aspect, n, view_dir, view_origin, view_normal, inv_proj);
-        
+		vec2 uv_sample_start = (jitter / float(sampleCount) + sampleOffset) * sample_scale * omega * aspect;
+		vec2 uv_sample_step = 1.0 / float(sampleCount) * sample_scale * omega * aspect;
+
+		uint sector_bitmask = trace_slice(1.0, screen_uv + uv_sample_start, uv_sample_step, n, view_dir, view_origin, view_normal, inv_proj);
+
+		// Trace other direction
+		sector_bitmask |= trace_slice(-1.0, screen_uv - uv_sample_start, -uv_sample_step, n, view_dir, view_origin, view_normal, inv_proj);
+    	
 		// Weigh slices based on how far their projected normal is from the surface normal 
 		visibility += projLength * vec2(1.0 - float(bit_count(sector_bitmask)) / float(sectorCount), 1.0);
 
-		// Trace other direction
-		sector_bitmask = trace_slice(screen_uv, -omega, jitter, sample_scale, aspect, n, view_dir, view_origin, view_normal, inv_proj);
-    	
-		visibility += projLength * vec2(1.0 - float(bit_count(sector_bitmask)) / float(sectorCount), 1.0);
-
-		phi += slice_angle_step + jitter;
+		phi += slice_angle_step;
     }
 
     return visibility.x / visibility.y;
