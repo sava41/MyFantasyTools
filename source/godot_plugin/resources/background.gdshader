@@ -18,6 +18,15 @@ uniform int ray_steps : hint_range(1, 64) = 16;
 uniform float ray_max_distance = 3;
 uniform float ray_thickness = 0.1;
 
+// Capsule shadow parameters
+const int MAX_CAPSULES = 10;
+uniform vec3 capsule_starts[MAX_CAPSULES];
+uniform vec3 capsule_ends[MAX_CAPSULES];
+uniform float capsule_radii[MAX_CAPSULES];
+uniform int capsule_count = 0;
+uniform float shadow_strength : hint_range(0.0, 2.0) = 1.5;
+uniform float shadow_falloff : hint_range(0.1, 10.0) = 2.0;
+
 const uint sectorCount = 32u;
 uniform int sampleCount = 4;
 uniform float sampleRadius = 0.25;
@@ -150,50 +159,107 @@ vec3 decode_direction(vec3 encoded) {
 	return vec3(dir.x, dir.z, -dir.y);
 }
 
-// Raymarch along light direction and check for depth buffer intersection
-float raymarch_shadow(
-	vec3 view_origin,
-	vec3 view_light_dir,
-	mat4 proj_mat,
-	mat4 inv_proj_mat
-) {
-	float step_size = ray_max_distance / float(ray_steps);
+// Fast inverse square root approximation
+float fast_acos_positive(float x) {
+	float p = -0.1565827 * x + 1.570796;
+	return p * sqrt(1.0 - x);
+}
 
-	for (int i = 1; i <= ray_steps; i++) {
-		// Step along the light direction
-		vec3 ray_view = view_origin + view_light_dir * step_size * float(i);
+float fast_acos_full(float x) {
+	float y = abs(x);
+	float p = -0.1565827 * y + 1.570796;
+	p *= sqrt(1.0 - y);
+	return x >= 0.0 ? p : pi - p;
+}
 
-		// Project to screen space
-		vec4 clip_pos = proj_mat * vec4(ray_view, 1.0);
+// Spherical caps intersection for directional occlusion
+// Based on "Ambient Aperture Lighting" by Oat and Sander 2007
+float spherical_caps_intersection(float cos_cap1, float cos_cap2, float cap2, float cos_distance) {
+	float r1 = fast_acos_positive(cos_cap1);
+	float r2 = cap2;
+	float d = fast_acos_full(cos_distance);
 
-		// Skip if behind camera
-		if (clip_pos.w <= 0.0) {
-			continue;
-		}
-
-		clip_pos.xyz /= clip_pos.w;
-		vec2 ray_screen_uv = clamp(clip_pos.xy * 0.5 + 0.5, vec2(0.0), vec2(1.0));
-
-		// Sample depth buffer
-		float buffer_depth = texture(depth_buffer, ray_screen_uv).x;
-
-		// Reconstruct world position from depth buffer
-		vec4 buffer_ndc = vec4(clip_pos.xy, buffer_depth, 1.0);
-		vec4 buffer_view = inv_proj_mat * buffer_ndc;
-		buffer_view.xyz /= buffer_view.w;
-
-		// Compare depths in view space
-		float ray_depth = ray_view.z;
-		float scene_depth = buffer_view.z;
-
-		// Check if ray is occluded by depth buffer
-		// Ray is behind the scene surface (within thickness tolerance)
-		if (ray_depth < scene_depth && ray_depth > scene_depth - ray_thickness) {
-			return 0.0;
-		}
+	if (min(r1, r2) <= max(r1, r2) - d) {
+		return 1.0 - max(cos_cap1, cos_cap2);
+	} else if (r1 + r2 <= d) {
+		return 0.0;
 	}
 
-	return 1.0; // Not shadowed
+	float delta = abs(r1 - r2);
+	float x = 1.0 - clamp((d - delta) / max(r1 + r2 - delta, 0.0001), 0.0, 1.0);
+	float area = x * x * (-2.0 * x + 3.0); // simplified smoothstep
+	return area * (1.0 - max(cos_cap1, cos_cap2));
+}
+
+// Directional occlusion from a sphere
+float directional_occlusion_sphere(vec3 pos, vec3 sphere_center, float sphere_radius, vec3 light_dir, float cone_angle) {
+	vec3 occluder = sphere_center - pos;
+	float occluder_length2 = dot(occluder, occluder);
+	vec3 occluder_dir = occluder * inversesqrt(occluder_length2);
+
+	float cos_phi = dot(occluder_dir, light_dir);
+	float cos_theta = sqrt(occluder_length2 / (sphere_radius * sphere_radius + occluder_length2));
+	float cos_cone = cos(cone_angle);
+
+	return 1.0 - spherical_caps_intersection(cos_theta, cos_cone, cone_angle, cos_phi) / (1.0 - cos_cone);
+}
+
+// Directional occlusion from a capsule
+float directional_occlusion_capsule(vec3 pos, vec3 capsule_a, vec3 capsule_b, float capsule_radius, vec3 light_dir, float cone_angle) {
+	vec3 ld = capsule_b - capsule_a;
+	vec3 l0 = capsule_a - pos;
+	float a = dot(light_dir, ld);
+	float t = clamp(dot(l0, a * light_dir - ld) / (dot(ld, ld) - a * a), 0.0, 1.0);
+	vec3 pos_to_ray = capsule_a + t * ld;
+
+	return directional_occlusion_sphere(pos, pos_to_ray, capsule_radius, light_dir, cone_angle);
+}
+
+// Check if a point is inside a capsule
+bool point_inside_capsule(vec3 point, vec3 capsule_a, vec3 capsule_b, float capsule_radius) {
+	vec3 ab = capsule_b - capsule_a;
+	vec3 ap = point - capsule_a;
+
+	// Project point onto capsule axis
+	float t = clamp(dot(ap, ab) / dot(ab, ab), 0.0, 1.0);
+	vec3 closest_point = capsule_a + t * ab;
+
+	// Check distance from closest point on axis
+	float dist = length(point - closest_point);
+	return dist <= capsule_radius;
+}
+
+// Calculate shadows using capsule proxy meshes
+float capsule_shadow(vec3 world_pos, vec3 light_dir, float cone_angle) {
+	float shadow = 1.0;
+
+	for (int i = 0; i < capsule_count && i < MAX_CAPSULES; i++) {
+		// Check if point is inside the capsule - if so, apply maximum shadow
+		if (point_inside_capsule(world_pos, capsule_starts[i], capsule_ends[i], capsule_radii[i])) {
+			return 0.0; // Full shadow
+		}
+
+		float occlusion = directional_occlusion_capsule(
+			world_pos,
+			capsule_starts[i],
+			capsule_ends[i],
+			capsule_radii[i],
+			light_dir,
+			cone_angle
+		);
+
+		// Enhance shadow darkness: 1.0 = no shadow, 0.0 = full shadow
+		// Apply power function to make shadows darker and more defined
+		float shadow_amount = 1.0 - occlusion;
+		shadow_amount = pow(shadow_amount, shadow_falloff) * shadow_strength;
+		shadow_amount = clamp(shadow_amount, 0.0, 1.0);
+
+		// Convert back: reduce the light by the shadow amount
+		float current_shadow = 1.0 - shadow_amount;
+		shadow = min(shadow, current_shadow);
+	}
+
+	return shadow;
 }
 
 void vertex() {
@@ -247,12 +313,13 @@ void fragment() {
 
 	vec3 light_view_dir = mat3(VIEW_MATRIX) * light_world_dir;
 
-	// Raymarch shadow
-	float shadow = raymarch_shadow(
-		view_depth_pos.xyz,
-		light_view_dir,
-		PROJECTION_MATRIX,
-		INV_PROJECTION_MATRIX
+	// Calculate shadow using capsule proxies
+	// Use cone angle of 45 degrees (converted to radians)
+	float cone_angle = radians(5.0);
+	float shadow = capsule_shadow(
+		world_depth_point.xyz,
+		light_world_dir,
+		cone_angle
 	);
 
 	//we need to comp the depth buffer and the depth texture before we calculate ao
