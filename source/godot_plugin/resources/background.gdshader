@@ -28,9 +28,9 @@ uniform float shadow_strength : hint_range(0.0, 2.0) = 1.5;
 uniform float shadow_falloff : hint_range(0.1, 10.0) = 2.0;
 
 const uint sectorCount = 32u;
-uniform int sampleCount = 4;
-uniform float sampleRadius = 0.25;
-uniform int sliceCount = 4;
+uniform int sampleCount = 3;
+uniform float sampleRadius = 0.2;
+uniform int sliceCount = 1;
 uniform float hitThickness = 0.25;
 uniform float sampleOffset = 0.01;
 
@@ -73,51 +73,16 @@ float fast_acos(float x) {
 	return (-0.69813170*x*x - 0.87266463)*x + 1.57079633;
 }
 
-uint trace_slice(float d_sign, vec2 uv_sample_start, vec2 uv_sample_step, float n, vec3 view_dir, vec3 view_origin, vec3 view_normal, mat4 inv_proj) {
-	uint sector_bitmask = 0u;
-
-	vec2 uv_sample = uv_sample_start;
-	
-	for (int i = 0; i < sampleCount; i++) {
-
-		vec2 sampleUV = clamp(uv_sample, vec2(0.0), vec2(1.0));
-		
-		float depth_sample = texture(depth_buffer, sampleUV).x;
-
-		vec4 buffer_ndc = vec4(sampleUV * 2.0 - 1.0, depth_sample, 1.0);
-		vec4 buffer_view = inv_proj * buffer_ndc;
-		buffer_view.xyz /= buffer_view.w;
-		
-		vec3 sampleDistance = buffer_view.xyz - view_origin;
-		float sampleLength = length(sampleDistance);
-
-		vec3 sampleHorizon = sampleDistance / sampleLength;
-
-		vec2 frontBackHorizon = vec2(0.0);
-		frontBackHorizon.x = dot(sampleHorizon, view_dir);
-		frontBackHorizon.y = dot(normalize(sampleDistance - view_dir * hitThickness), view_dir);
-
-		frontBackHorizon = fast_acos2(frontBackHorizon);
-		frontBackHorizon = clamp((d_sign * -frontBackHorizon - n + halfPi) / pi, 0.0, 1.0);
-		frontBackHorizon = d_sign > 0.0 ? frontBackHorizon.yx : frontBackHorizon.xy;
-
-		sector_bitmask = update_sectors(frontBackHorizon.x, frontBackHorizon.y, sector_bitmask);
-
-		uv_sample += uv_sample_step;
-	}
-
-	return sector_bitmask;
-}
-
 // AO algo based on GTVBAO
-float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_origin, vec3 view_normal, mat4 proj, mat4 inv_proj, float jitter) {
+float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_point, vec3 view_normal, mat4 proj, mat4 inv_proj, float jitter) {
 
-    vec3 view_dir = normalize(-view_origin);
+    vec3 view_dir = normalize(-view_point);
 	
 	float slice_angle_step = pi / float(sliceCount);
-    float sample_scale = (-sampleRadius * proj[0][0]) / view_origin.z;
+    float sample_scale = (-sampleRadius * proj[0][0]) / view_point.z;
     
 	vec2 visibility = vec2(0.0);
+	float ao = 0.0;
 	float phi = jitter;
     for (int i = 0; i < sliceCount; i++) {
         
@@ -126,27 +91,52 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_origin, vec3 view_normal, ma
         vec3 slice_normal = cross(direction, view_dir);
         vec3 projNormal = view_normal - slice_normal * dot(view_normal, slice_normal);
         float projLength = length(projNormal);
-		float cosN = clamp(dot(projNormal, view_dir) / projLength, -1.0, 1.0);
+		float cosN = dot(projNormal, view_dir) / projLength;
 
 		vec3 orthoDirection = cross(view_dir, slice_normal);
-        float signN = sign(dot(orthoDirection, projNormal));
+        float signN = sign(dot(projNormal, orthoDirection));
         float n = signN * fast_acos(cosN);
 
-		vec2 uv_sample_start = (jitter / float(sampleCount) + sampleOffset) * sample_scale * omega * aspect;
 		vec2 uv_sample_step = 1.0 / float(sampleCount) * sample_scale * omega * aspect;
+		vec2 uv_sample_offset =  (jitter / float(sampleCount) + sampleOffset) * sample_scale * omega * aspect;
 
-		uint sector_bitmask = trace_slice(1.0, screen_uv + uv_sample_start, uv_sample_step, n, view_dir, view_origin, view_normal, inv_proj);
+		uint sector_bitmask = 0u;		
+		for (int i = 0; i < sampleCount; i++) {
+			for(float d = -1.0; d <= 1.0; d += 2.0)
+        	{
+				vec2 sampleUV = clamp(screen_uv + uv_sample_offset * d, vec2(0.0), vec2(1.0));
+				
+				float depth_sample = texture(depth_buffer, sampleUV).x;
 
-		// Trace other direction
-		sector_bitmask |= trace_slice(-1.0, screen_uv - uv_sample_start, -uv_sample_step, n, view_dir, view_origin, view_normal, inv_proj);
+				vec4 buffer_ndc = vec4(sampleUV * 2.0 - 1.0, depth_sample, 1.0);
+				vec4 buffer_view = inv_proj * buffer_ndc;
+				buffer_view.xyz /= buffer_view.w;
+				
+				vec3 delta_pos = buffer_view.xyz - view_point;
+				vec3 delta_pos_backface = delta_pos - view_dir * hitThickness;
+
+				vec2 frontBackHorizon = vec2(dot(normalize(delta_pos), view_dir), dot(normalize(delta_pos_backface), view_dir));
+
+				frontBackHorizon = fast_acos2(frontBackHorizon);
+				frontBackHorizon = clamp((d * -frontBackHorizon - n + halfPi) / pi, 0.0, 1.0);
+
+				frontBackHorizon = d >= 0.0 ? frontBackHorizon.yx : frontBackHorizon.xy;
+
+				sector_bitmask = update_sectors(frontBackHorizon.x, frontBackHorizon.y, sector_bitmask);
+			}
+
+			uv_sample_offset += uv_sample_step;
+		}
     	
 		// Weigh slices based on how far their projected normal is from the surface normal 
 		visibility += projLength * vec2(1.0 - float(bit_count(sector_bitmask)) / float(sectorCount), 1.0);
+		ao += 1.0 - float(bit_count(sector_bitmask)) / float(sectorCount);
 
 		phi += slice_angle_step;
     }
 
-    return visibility.x / visibility.y;
+    //return visibility.x / visibility.y;
+	return ao / float(sliceCount);
 }
 
 // Decode world-space direction vector from [0,1] RGB to [-1,1] range
@@ -306,7 +296,7 @@ void fragment() {
 
 	vec4 clip_pos = PROJECTION_MATRIX * view_depth_pos;
 	clip_pos.xyz /= clip_pos.w;
-	DEPTH = clip_pos.z;
+	DEPTH = 1.0;//clip_pos.z;
 
 	// Sample and decode light direction
 	vec3 light_world_dir = decode_direction(texture(light_direction, screen_uv_uncropped).rgb);
@@ -315,7 +305,7 @@ void fragment() {
 
 	// Calculate shadow using capsule proxies
 	// Use cone angle of 45 degrees (converted to radians)
-	float cone_angle = radians(5.0);
+	float cone_angle = radians(35.0);
 	float shadow = capsule_shadow(
 		world_depth_point.xyz,
 		light_world_dir,
@@ -346,5 +336,6 @@ void fragment() {
 	vec3 sampled_color_direct = sample_zero_outside(color_direct, screen_uv_uncropped).rgb;
 	vec3 sampled_color_indirect = sample_zero_outside(color_indirect, screen_uv_uncropped).rgb;
 	
-	ALBEDO.rgb = sampled_color_direct * shadow + sampled_color_indirect * ao;
+	ALBEDO.rgb = vec3(ao * ao * ao * ao);
+	//ALBEDO.rgb = sampled_color_direct * clamp(mix(-100.0, 1.0, shadow), 0.0, 1.0) + sampled_color_indirect * ao;
 }
