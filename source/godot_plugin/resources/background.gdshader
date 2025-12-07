@@ -140,14 +140,36 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_point, vec3 view_normal, mat
     return ao_acc / weight_acc;
 }
 
-// Decode world-space direction vector from [0,1] RGB to [-1,1] range
-// Inverse of encoding: output = input * 2.0 - 1.0
+// Decode octohedral encoded direction vector
+// Input: encoded.rg = octohedral coords in [0,1], encoded.b = cone half angle
+// Output: decoded world-space direction vector
 // Also converts from Blender (Z-up) to Godot (Y-up) coordinate system
-vec3 decode_direction(vec3 encoded) {
-	vec3 dir = encoded * 2.0 - 1.0;
+vec3 decode_octohedral_direction(vec3 encoded) {
+	// Decode octohedral coordinates from [0,1] to [-1,1]
+	vec2 oct = encoded.rg * 2.0 - 1.0;
+
+	// Reconstruct the 3D direction from octohedral encoding
+	vec3 n = vec3(oct.x, oct.y, 1.0 - abs(oct.x) - abs(oct.y));
+
+	// Apply correction for negative z hemisphere
+	if (n.z < 0.0) {
+		vec2 old_xy = n.xy;
+		n.x = (1.0 - abs(old_xy.y)) * sign(old_xy.x);
+		n.y = (1.0 - abs(old_xy.x)) * sign(old_xy.y);
+	}
+
+	n = normalize(n);
+
+	// Convert from Blender (Z-up) to Godot (Y-up) coordinate system
 	// Blender: X right, Y forward, Z up
 	// Godot:   X right, Y up, Z back
-	return vec3(dir.x, dir.z, -dir.y);
+	return vec3(n.x, n.z, -n.y);
+}
+
+// Extract cone half angle from encoded data
+float decode_cone_angle(vec3 encoded) {
+	// Decode from [0,1] normalized range back to radians
+	return encoded.b * halfPi;
 }
 
 // Fast inverse square root approximation
@@ -299,14 +321,14 @@ void fragment() {
 	clip_pos.xyz /= clip_pos.w;
 	DEPTH = clip_pos.z;
 
-	// Sample and decode light direction
-	vec3 light_world_dir = decode_direction(texture(light_direction, screen_uv_uncropped).rgb);
+	// Sample and decode light direction with octohedral encoding
+	vec3 light_direction_data = texture(light_direction, screen_uv_uncropped).rgb;
+	vec3 light_world_dir = decode_octohedral_direction(light_direction_data);
+	float cone_angle = decode_cone_angle(light_direction_data);
 
 	vec3 light_view_dir = mat3(VIEW_MATRIX) * light_world_dir;
 
-	// Calculate shadow using capsule proxies
-	// Use cone angle of 45 degrees (converted to radians)
-	float cone_angle = radians(35.0);
+	// Calculate shadow using capsule proxies with decoded cone angle
 	float shadow = capsule_shadow(
 		world_depth_point.xyz,
 		light_world_dir,
