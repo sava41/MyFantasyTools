@@ -35,19 +35,25 @@ class Navmesh:
 
         return set(adj_views)
 
-    def find_convex_hull_area(self, view_id) -> list:
+    def find_convex_hull_area(self, view_id) -> tuple:
         bm = bmesh.new()
         bm.from_mesh(self.object.data)
         view_attribute = bm.faces.layers.int["Views"]
 
         verts = list()
+        min_z = float('inf')
+        max_z = float('-inf')
+
         for face in bm.faces:
             if face[view_attribute] is view_id:
                 for vert in face.verts:
                     verts.append([vert.co.x, vert.co.y])
+                    min_z = min(min_z, vert.co.z)
+                    max_z = max(max_z, vert.co.z)
 
         vert_indicies = mathutils.geometry.convex_hull_2d(verts)
 
         bm.free()
 
-        return [verts[i] for i in vert_indicies if i < len(verts)]
+        convex_hull_2d = [verts[i] for i in vert_indicies if i < len(verts)]
+        return convex_hull_2d, min_z, max_z
