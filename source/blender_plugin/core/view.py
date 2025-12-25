@@ -131,21 +131,16 @@ class View:
 
     # Algorithm for placing env probe
     # takes in the perimeter of the view nav mesh
-    # raycasts from the main cmaera out to the furthest bounds of the perimeter
+    # raycasts from the main camera out to the furthest bounds of the perimeter
     # places env probe in the center of the raycast
-    def set_env_probe_location(self, convex_hull_data):
+    def set_env_probe_location(self, navmesh_data):
 
-        convex_hull, min_z, max_z = convex_hull_data
+        tris, convex_hull, = navmesh_data
 
-        # for now lets just make the prism 1000m tall
-        max_z += 1000.0
-
+        trace_dir = self._main_camera.matrix_world.to_quaternion() @ mathutils.Vector((0.0, 0.0, -10000.0))
         trace_start = self._main_camera.location
-        trace_end = trace_start + (
-            self._main_camera.matrix_world.to_quaternion()
-            @ mathutils.Vector((0.0, 0.0, -10000.0))
-        )
-
+        trace_end = trace_start +  trace_dir
+        
         point_close = trace_end
         point_far = trace_start
 
@@ -162,10 +157,6 @@ class View:
             )
 
             if intersection:
-                # Check if intersection is within the prism's Z bounds
-                if intersection.z < min_z or intersection.z > max_z:
-                    continue
-
                 ab_length = point_a - point_b
                 ab_length.z = 0
                 ab_length = ab_length.length
@@ -186,33 +177,18 @@ class View:
                     ).length:
                         point_far = intersection
 
-        # Ray trace top face (plane at max_z with upward normal)
-        top_plane_point = mathutils.Vector((0.0, 0.0, max_z))
-        top_plane_normal = mathutils.Vector((0.0, 0.0, 1.0))
+        # Ray trace navmesh tris
+        for tri in tris:
+            intersection = mathutils.geometry.intersect_ray_tri(tri.verts[0], tri.verts[1], tri.verts[2], trace_dir, trace_start)
 
-        intersection = mathutils.geometry.intersect_line_plane(
-            trace_start, trace_end, top_plane_point, top_plane_normal
-        )
-
-        if intersection:
-            if (point_close - trace_start).length > (intersection - trace_start).length:
-                point_close = intersection
-            if (point_far - trace_start).length < (intersection - trace_start).length:
+            if intersection:
                 point_far = intersection
+        
+        if point_close is trace_end:
+            point_close = trace_start
 
-        # Ray trace bottom face (plane at min_z with downward normal)
-        bottom_plane_point = mathutils.Vector((0.0, 0.0, min_z))
-        bottom_plane_normal = mathutils.Vector((0.0, 0.0, -1.0))
-
-        intersection = mathutils.geometry.intersect_line_plane(
-            trace_start, trace_end, bottom_plane_point, bottom_plane_normal
-        )
-
-        if intersection:
-            if (point_close - trace_start).length > (intersection - trace_start).length:
-                point_close = intersection
-            if (point_far - trace_start).length < (intersection - trace_start).length:
-                point_far = intersection
+        if point_far is trace_start:
+            point_far = trace_start
 
         self._env_camera_obj.location = (point_close + point_far) * 0.5
 

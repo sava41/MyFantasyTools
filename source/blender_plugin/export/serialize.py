@@ -17,8 +17,8 @@ def serialize_level(navmesh, views) -> bytearray:
 
     for i, view in enumerate(views):
         view._adjacent_views = navmesh.find_adjacent_views(i)
-        convex_hull = navmesh.find_convex_hull_area(i)
-        view.set_env_probe_location(convex_hull)
+        tris = navmesh.get_view_id_tris(i)
+        view.set_env_probe_location(tris)
 
     builder = flatbuffers.Builder(4096)
 
