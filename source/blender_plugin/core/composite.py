@@ -23,6 +23,8 @@ class CompositeManager:
         scene.view_layers["ViewLayer"].use_pass_transmission_direct = True
         scene.view_layers["ViewLayer"].use_pass_transmission_indirect = True
         scene.view_layers["ViewLayer"].use_pass_transmission_color = True
+        scene.view_layers["ViewLayer"].use_pass_emit = True
+        scene.view_layers["ViewLayer"].use_pass_environment = True
 
 
         # Create new compositor node tree or reuse existing one
@@ -157,6 +159,18 @@ class CompositeManager:
         indirect_sum2.blend_type = "ADD"
         indirect_sum2.inputs[0].default_value = 1.0  # Factor
 
+        # Add emission to indirect
+        indirect_emission_add = self._tree.nodes.new(type="ShaderNodeMix")
+        indirect_emission_add.data_type = 'RGBA'
+        indirect_emission_add.blend_type = "ADD"
+        indirect_emission_add.inputs[0].default_value = 1.0  # Factor
+
+        # Add environment to indirect
+        indirect_environment_add = self._tree.nodes.new(type="ShaderNodeMix")
+        indirect_environment_add.data_type = 'RGBA'
+        indirect_environment_add.blend_type = "ADD"
+        indirect_environment_add.inputs[0].default_value = 1.0  # Factor
+
         # link nodes
         links = self._tree.links
         links.clear()
@@ -196,8 +210,14 @@ class CompositeManager:
         links.new(indirect_sum1.outputs[2], indirect_sum2.inputs[6])
         links.new(transmission_indirect_mul.outputs[2], indirect_sum2.inputs[7])
 
+        links.new(indirect_sum2.outputs[2], indirect_emission_add.inputs[6])
+        links.new(self._layer_node.outputs.get("Emission"), indirect_emission_add.inputs[7])
+
+        links.new(indirect_emission_add.outputs[2], indirect_environment_add.inputs[6])
+        links.new(self._layer_node.outputs.get("Environment"), indirect_environment_add.inputs[7])
+
         # Denoise ColorIndirect
-        links.new(indirect_sum2.outputs[2], denoise_indirect_node.inputs[0])
+        links.new(indirect_environment_add.outputs[2], denoise_indirect_node.inputs[0])
         links.new(self._layer_node.outputs.get("Normal"), denoise_indirect_node.inputs[2])
         links.new(denoise_indirect_node.outputs[0], self._output_node.inputs.get("ColorIndirect#"))
 
