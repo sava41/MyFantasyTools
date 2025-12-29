@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="docs/wizard.svg" height="256" alt="My Fantasy Tools logo">
+	<img src="docs/wizard.svg" height="128" alt="My Fantasy Tools logo">
 	<br><em><b>Pre-rendered background game tools</b></em></br>
 </p>
 
