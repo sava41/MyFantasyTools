@@ -24,36 +24,53 @@ class Navmesh:
         view_attribute = bm.faces.layers.int["Views"]
 
         adj_views = list()
-        for face in bm.faces:
-            if face[view_attribute] is view_id:
-                for edge in face.edges:
-                    for adj_face in edge.link_faces:
-                        if adj_face[view_attribute] is not view_id:
-                            adj_views.append(adj_face[view_attribute])
+
+        current_view_faces = [face for face in bm.faces if face[view_attribute] is view_id]
+
+        for face in current_view_faces:
+            for edge in face.edges:
+                for adj_face in edge.link_faces:
+                    if adj_face[view_attribute] is not view_id:
+                        adj_views.append(adj_face[view_attribute])
+
+            # Check vertex-edge-vertex adjacency
+            for vert in face.verts:
+                for edge in vert.link_edges:
+                    other_vert = edge.other_vert(vert)
+                    if other_vert not in face.verts:
+                        for other_face in other_vert.link_faces:
+                            if other_face[view_attribute] is not view_id:
+                                adj_views.append(other_face[view_attribute])
 
         bm.free()
 
         return set(adj_views)
 
-    def find_convex_hull_area(self, view_id) -> tuple:
+    def get_view_id_tris(self, view_id) -> tuple:
         bm = bmesh.new()
         bm.from_mesh(self.object.data)
+        bm.faces.ensure_lookup_table()
         view_attribute = bm.faces.layers.int["Views"]
 
         verts = list()
-        min_z = float('inf')
-        max_z = float('-inf')
+        triangles = list()
+        # Triangulate the bmesh
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        bm.faces.ensure_lookup_table()
 
         for face in bm.faces:
             if face[view_attribute] is view_id:
+                # Create a simple object to hold triangle vertex coordinates
+                tri_verts = [vert.co.copy() for vert in face.verts]
+                tri_obj = type('Triangle', (), {'verts': tri_verts})()
+                triangles.append(tri_obj)
                 for vert in face.verts:
                     verts.append([vert.co.x, vert.co.y])
-                    min_z = min(min_z, vert.co.z)
-                    max_z = max(max_z, vert.co.z)
 
         vert_indicies = mathutils.geometry.convex_hull_2d(verts)
 
         bm.free()
 
         convex_hull_2d = [verts[i] for i in vert_indicies if i < len(verts)]
-        return convex_hull_2d, min_z, max_z
+
+        return triangles, convex_hull_2d

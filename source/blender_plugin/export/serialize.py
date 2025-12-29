@@ -17,15 +17,15 @@ def serialize_level(navmesh, views) -> bytearray:
 
     for i, view in enumerate(views):
         view._adjacent_views = navmesh.find_adjacent_views(i)
-        convex_hull = navmesh.find_convex_hull_area(i)
-        view.set_env_probe_location(convex_hull)
+        tris = navmesh.get_view_id_tris(i)
+        view.set_env_probe_location(tris)
 
     builder = flatbuffers.Builder(4096)
 
     serialized_views = list()
     for view in views:
 
-        name = builder.CreateString(view._main_camera.name)
+        name = builder.CreateString(view._name)
 
         View.StartAdjacentViewsVector(builder, len(view._adjacent_views))
         for adj_view in view._adjacent_views:

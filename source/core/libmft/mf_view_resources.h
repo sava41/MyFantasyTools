@@ -20,12 +20,14 @@ namespace mft
       public:
         enum ImageType : uint32_t
         {
-            Color       = 1 << 0,
-            Depth       = 1 << 1,
-            Environment = 1 << 2
+            ColorDirect    = 1 << 0,
+            ColorIndirect  = 1 << 1,
+            Depth          = 1 << 2,
+            Environment    = 1 << 3,
+            LightDirection = 1 << 4
         };
 
-        const std::unordered_map<ImageType, std::string> ImageTypeStrings{ { Color, "Color" }, { Depth, "Depth" }, { Environment, "Environment" } };
+        const std::unordered_map<ImageType, std::string> ImageTypeStrings{ { ColorDirect, "ColorDirect" }, { ColorIndirect, "ColorIndirect" }, { Depth, "Depth" }, { Environment, "Environment" }, { LightDirection, "LightDirection" } };
 
         ViewResources();
         ~ViewResources();

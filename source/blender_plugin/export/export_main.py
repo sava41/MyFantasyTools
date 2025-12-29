@@ -89,7 +89,7 @@ class MFT_OT_Export(Operator):
 
                     os.makedirs(output_path_final, exist_ok=True)
 
-                    t = threading.Thread(target=save.convert_all_exr_to_jxl, args=(prev_view._camera_name, prev_view._render_output_path, str(output_path_final.resolve())))
+                    t = threading.Thread(target=save.convert_all_exr_to_jxl, args=(prev_view._name, prev_view._render_output_path, str(output_path_final.resolve())))
                     t.start()
 
                     self._jxl_threads.append(t)

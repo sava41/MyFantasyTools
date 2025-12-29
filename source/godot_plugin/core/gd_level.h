@@ -28,6 +28,8 @@ class MFLevel : public godot::Node3D
     bool set_closest_view( const godot::Vector3& point );
     bool look_at( godot::Vector3 point, bool clamp_region = true, float smooth = 0.0 );
 
+    void update_shadows();
+
     void set_min_view_duration( float timeMS );
     float get_min_view_duration() const;
 
