@@ -29,7 +29,8 @@ Note: If the build setup has issues finding python, try manually setting `Python
 ## Usage
 
 ### Blender Plugin
-**You have to use my blender fork to use this plugin. [clone this branch](https://github.com/sava41/blender/tree/directional-lightmaps) and build it to use the MFT plugin**
+> [!IMPORTANT]
+> You have to use my blender fork to use this plugin. [clone this branch](https://github.com/sava41/blender/tree/directional-lightmaps) and build it to use the MFT plugin**
 
 The Blender plugin automates exporting a Blender scene into an MFT level. After building and installing the project, the `mft_blender_addon` directory can be zipped and installed using the `Install from disk` option in Blenders settings. Pre-built addons can be found in the releases (Windows and MacOs only).
 
