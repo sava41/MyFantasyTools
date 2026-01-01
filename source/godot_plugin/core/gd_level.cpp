@@ -62,7 +62,7 @@ void MFLevel::_enter_tree()
 
         godot::Ref<godot::QuadMesh> backgroundMesh = memnew( godot::QuadMesh );
         backgroundMesh->set_size( { 2.0, 2.0 } );
-        backgroundMesh->set_flip_faces( true );
+        backgroundMesh->set_flip_faces( false );
         backgroundMesh->set_material( m_backgroundMaterial );
 
         m_background->set_mesh( backgroundMesh );

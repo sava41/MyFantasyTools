@@ -275,17 +275,14 @@ float capsule_shadow(vec3 world_pos, vec3 light_dir, float cone_angle) {
 	return shadow;
 }
 
-varying vec4 view_dir_uncropped;
-
 void vertex() {
 	// Transform chain: ndc_uncropped -> view_uncropped -> world -> view_cropped -> ndc_cropped
-
-	vec2 ndc_uncropped = UV * 2.0 - 1.0;
+	vec2 ndc_uncropped = VERTEX.xy;
 
 	float tan_half_fov_h_uncropped = tan(uncropped_fov * 0.5);
 	float tan_half_fov_v_uncropped = tan_half_fov_h_uncropped * uncropped_aspect;
 
-	view_dir_uncropped = vec4(
+	vec4 view_dir_uncropped = vec4(
 		ndc_uncropped.x * tan_half_fov_h_uncropped,
 		ndc_uncropped.y * tan_half_fov_v_uncropped,
 		-1.0,
@@ -295,12 +292,13 @@ void vertex() {
 	vec4 ndc_cropped = PROJECTION_MATRIX * VIEW_MATRIX * uncropped_view_mat * view_dir_uncropped;
 
 	POSITION = ndc_cropped;
-	UV.y = 1.0 - UV.y;
+	COLOR = view_dir_uncropped;
 }
 
 void fragment() {
 	
 	float linear_depth_uncropped = texture(depth, UV).x;
+	vec4 view_dir_uncropped = COLOR;
 
 	vec3 uncropped_view_depth_pos = -view_dir_uncropped.xyz * (linear_depth_uncropped / view_dir_uncropped.z);
 
@@ -350,9 +348,8 @@ void fragment() {
 	float jitter = randf(int(FRAGCOORD.x), int(FRAGCOORD.y)) - 0.5;
 	float ao = get_ao(SCREEN_UV, aspect, view_depth_pos.xyz, view_point_normal, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, jitter);
 
-	// Sample texture and clamp to black outside of 0-1 uv range
-	vec3 sampled_color_direct = sample_zero_outside(color_direct, UV).rgb;
-	vec3 sampled_color_indirect = sample_zero_outside(color_indirect, UV).rgb;
+	vec3 sampled_color_direct = texture(color_direct, UV).rgb;
+	vec3 sampled_color_indirect = texture(color_indirect, UV).rgb;
 	
 	ALBEDO.rgb = sampled_color_direct * clamp(mix(-100.0, 1.0, shadow), 0.0, 1.0) + sampled_color_indirect * ao;
 }
