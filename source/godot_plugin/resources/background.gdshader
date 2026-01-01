@@ -275,39 +275,34 @@ float capsule_shadow(vec3 world_pos, vec3 light_dir, float cone_angle) {
 	return shadow;
 }
 
+varying vec4 view_dir_uncropped;
+
 void vertex() {
-	POSITION = vec4(VERTEX.xy, 1.0, 1.0);
+	// Transform chain: ndc_uncropped -> view_uncropped -> world -> view_cropped -> ndc_cropped
+
+	vec2 ndc_uncropped = UV * 2.0 - 1.0;
+
+	float tan_half_fov_h_uncropped = tan(uncropped_fov * 0.5);
+	float tan_half_fov_v_uncropped = tan_half_fov_h_uncropped * uncropped_aspect;
+
+	view_dir_uncropped = vec4(
+		ndc_uncropped.x * tan_half_fov_h_uncropped,
+		ndc_uncropped.y * tan_half_fov_v_uncropped,
+		-1.0,
+		1.0
+	);
+
+	vec4 ndc_cropped = PROJECTION_MATRIX * VIEW_MATRIX * uncropped_view_mat * view_dir_uncropped;
+
+	POSITION = ndc_cropped;
+	UV.y = 1.0 - UV.y;
 }
 
 void fragment() {
-
-	// Reproject uvs to uncropped uv space
-
-	vec4 ndc = vec4(SCREEN_UV * 2.0 - 1.0, 1.0, 1.0);
-
-	vec4 world_view_point = INV_VIEW_MATRIX * INV_PROJECTION_MATRIX * ndc;
-  	world_view_point.xyz /= world_view_point.w;
-	world_view_point.w = 1.0;
-
-	vec3 view_dir_uncropped = vec4(inverse(uncropped_view_mat) * world_view_point).xyz;
-
-	float tan_half_fov_h_uncropped = tan(uncropped_fov * 0.5);
-	float tan_half_fov_v_uncropped = tan_half_fov_h_uncropped  * uncropped_aspect;
-
-	vec2 ndc_uncropped = view_dir_uncropped.xy / view_dir_uncropped.z;
-	ndc_uncropped.x /= tan_half_fov_h_uncropped ;
-	ndc_uncropped.y /= tan_half_fov_v_uncropped;
 	
-	// The x slice_normal is flipped, not sure why
-	ndc_uncropped.x = -ndc_uncropped.x;
+	float linear_depth_uncropped = texture(depth, UV).x;
 
-	vec2 screen_uv_uncropped = ndc_uncropped * 0.5 + 0.5;
-
-	// Reproject depth to cropped projection space
-	
-	float linear_depth_uncropped = texture(depth, screen_uv_uncropped).x;
-
-	vec3 uncropped_view_depth_pos = -view_dir_uncropped * (linear_depth_uncropped / view_dir_uncropped.z);
+	vec3 uncropped_view_depth_pos = -view_dir_uncropped.xyz * (linear_depth_uncropped / view_dir_uncropped.z);
 
 	vec4 world_depth_point = uncropped_view_mat * vec4(uncropped_view_depth_pos, 1.0);
 	world_depth_point.xyz /= world_depth_point.w;
@@ -322,7 +317,7 @@ void fragment() {
 	DEPTH = clip_pos.z;
 
 	// Sample and decode light direction with octohedral encoding
-	vec3 light_direction_data = texture(light_direction, screen_uv_uncropped).rgb;
+	vec3 light_direction_data = texture(light_direction, UV).rgb;
 	vec3 light_world_dir = decode_octohedral_direction(light_direction_data);
 	float cone_angle = decode_cone_angle(light_direction_data);
 
@@ -356,8 +351,8 @@ void fragment() {
 	float ao = get_ao(SCREEN_UV, aspect, view_depth_pos.xyz, view_point_normal, PROJECTION_MATRIX, INV_PROJECTION_MATRIX, jitter);
 
 	// Sample texture and clamp to black outside of 0-1 uv range
-	vec3 sampled_color_direct = sample_zero_outside(color_direct, screen_uv_uncropped).rgb;
-	vec3 sampled_color_indirect = sample_zero_outside(color_indirect, screen_uv_uncropped).rgb;
+	vec3 sampled_color_direct = sample_zero_outside(color_direct, UV).rgb;
+	vec3 sampled_color_indirect = sample_zero_outside(color_indirect, UV).rgb;
 	
 	ALBEDO.rgb = sampled_color_direct * clamp(mix(-100.0, 1.0, shadow), 0.0, 1.0) + sampled_color_indirect * ao;
 }
