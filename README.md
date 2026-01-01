@@ -1,9 +1,10 @@
+# My Fantasy Tools
+
 <p align="center">
 	<img src="docs/wizard.svg" height="200" alt="My Fantasy Tools logo">
-	<br><em><b>Pre-rendered background game tools</b></em></br>
 </p>
 
-This project is a pipeline for making pre-rendered background fixed perspective camera games like PS1 Resident Evil and Final Fantasy. The tools are intended as a end-to-end solution from the creation of the backgrounds in Blender to the loading of the data in your game engine of choice.
+This project is a pipeline for making pre-rendered background, fixed-perspective camera games like PS1 Resident Evil and Final Fantasy. The tools are intended to be an end-to-end solution from the creation of the backgrounds in Blender to the loading of the data in your game engine of choice.
 
 ![Example Video](docs/demo.webp)
 
