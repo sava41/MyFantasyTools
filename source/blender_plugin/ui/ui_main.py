@@ -50,8 +50,10 @@ class MFT_PT_MainPanel(Panel):
             if camera_item.camera:
                 space = context.space_data
                 r3d = space.region_3d if space else None
-                in_cam_view = (r3d and r3d.view_perspective == 'CAMERA'
-                               and space.camera == camera_item.camera)
+                in_cam_view = (r3d and r3d.view_perspective == 'CAMERA' and
+                               space.camera is not None and
+                               (space.camera == camera_item.camera or
+                                space.camera.name.startswith("_mft_preview_")))
                 if in_cam_view:
                     box.operator("mft.set_viewport_camera",
                                  text="Exit Camera View", icon='LOOP_BACK')
