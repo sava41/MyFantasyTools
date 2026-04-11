@@ -183,6 +183,34 @@ class MFT_OT_RemoveCamera(Operator):
         return {'FINISHED'}
 
 
+class MFT_OT_SetViewportCamera(Operator):
+    """Toggle looking through the selected camera in the viewport"""
+    bl_idname = "mft.set_viewport_camera"
+    bl_label = "Toggle Viewport Camera"
+    bl_description = "Look through the selected camera in the viewport, or return to perspective"
+
+    @classmethod
+    def poll(cls, context):
+        return (context.space_data and
+                context.space_data.type == 'VIEW_3D' and
+                context.scene.mft_camera_index >= 0 and
+                context.scene.mft_camera_index < len(context.scene.mft_cameras) and
+                bool(context.scene.mft_cameras[context.scene.mft_camera_index].camera))
+
+    def execute(self, context):
+        camera_obj = context.scene.mft_cameras[context.scene.mft_camera_index].camera
+        space = context.space_data
+        r3d = space.region_3d
+
+        if r3d.view_perspective == 'CAMERA' and space.camera == camera_obj:
+            r3d.view_perspective = 'PERSP'
+        else:
+            space.camera = camera_obj
+            r3d.view_perspective = 'CAMERA'
+
+        return {'FINISHED'}
+
+
 def register_properties():
     bpy.types.Scene.mft_global_settings = PointerProperty(type=MFT_GlobalSettings)
     bpy.types.Scene.mft_cameras = CollectionProperty(type=MFT_Camera)
@@ -199,6 +227,7 @@ classes = (
     MFT_Camera,
     MFT_OT_AddCamera,
     MFT_OT_RemoveCamera,
+    MFT_OT_SetViewportCamera,
 )
 
 def register():

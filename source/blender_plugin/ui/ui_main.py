@@ -48,6 +48,17 @@ class MFT_PT_MainPanel(Panel):
         if scene.mft_camera_index >= 0 and scene.mft_camera_index < len(scene.mft_cameras):
             camera_item = scene.mft_cameras[scene.mft_camera_index]
             if camera_item.camera:
+                space = context.space_data
+                r3d = space.region_3d if space else None
+                in_cam_view = (r3d and r3d.view_perspective == 'CAMERA'
+                               and space.camera == camera_item.camera)
+                if in_cam_view:
+                    box.operator("mft.set_viewport_camera",
+                                 text="Exit Camera View", icon='LOOP_BACK')
+                else:
+                    box.operator("mft.set_viewport_camera",
+                                 text="Look Through Camera", icon='CAMERA_DATA')
+                
                 box.label(text=f"{camera_item.camera.name} View Properties")
                 box.prop(camera_item, "max_pan")
                 box.prop(camera_item, "max_tilt")
@@ -55,8 +66,16 @@ class MFT_PT_MainPanel(Panel):
                 box.label(text="No camera selected")
 
         box = layout.box()
-        box.label(text="Nav Mesh")
+        box.label(text="Navmesh")
         box.prop(scene.mft_global_settings, "navmesh_object", text="")
+
+        shading = context.space_data.shading
+        if shading.color_type == 'VERTEX':
+            box.operator("mft.toggle_face_color_display",
+                            text="Hide Colors", icon='HIDE_ON')
+        else:
+            box.operator("mft.toggle_face_color_display",
+                            text="View Colors", icon='HIDE_OFF')
 
         # Show navmesh editing buttons when in edit mode on the navmesh
         navmesh_obj = scene.mft_global_settings.navmesh_object
@@ -64,13 +83,6 @@ class MFT_PT_MainPanel(Panel):
                 context.mode == 'EDIT_MESH' and
                 context.edit_object and
                 context.edit_object == navmesh_obj):
-            shading = context.space_data.shading
-            if shading.color_type == 'VERTEX':
-                box.operator("mft.toggle_face_color_display",
-                             text="Hide Colors", icon='HIDE_ON')
-            else:
-                box.operator("mft.toggle_face_color_display",
-                             text="View Colors", icon='HIDE_OFF')
             box.operator("mft.assign_camera_to_faces",
                          text="Assign Selected Camera to Selected", icon='BRUSH_DATA')
 
