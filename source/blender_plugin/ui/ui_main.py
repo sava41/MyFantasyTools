@@ -9,10 +9,16 @@ class MFT_UL_CameraList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             row = layout.row(align=True)
+            # Draw colored circle
+            color_box = row.row()
+            color_box.scale_x = 0.3
+            color_box.prop(item, "color", text="")
+            # Camera name and enabled checkbox
             row.prop(item.camera, "name", text="", emboss=False, icon='CAMERA_DATA')
             row.prop(item, "enabled", text="")
         elif self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
+            layout.prop(item, "color", text="")
             layout.prop(item.camera, "name", text="", emboss=False, icon='CAMERA_DATA')
 
 class MFT_PT_MainPanel(Panel):
@@ -74,7 +80,58 @@ class MFT_PT_MainPanel(Panel):
             col.operator("mft.cancel", icon='CANCEL')
         else:
             col.operator("mft.export", icon='RENDER_STILL')
-        
+
+
+class MFT_PT_NavmeshEditPanel(Panel):
+    """Navmesh Face Assignment Panel - shown in edit mode"""
+    bl_label = "Navmesh Camera Assignment"
+    bl_idname = "MFT_PT_NavmeshEditPanel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'My Fantasy Tools'
+
+    @classmethod
+    def poll(cls, context):
+        # Only show when in edit mode on a mesh object
+        return (context.mode == 'EDIT_MESH' and
+                context.edit_object and
+                context.edit_object.type == 'MESH')
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        # Toggle face color display
+        box = layout.box()
+        box.label(text="Viewport Display:")
+        shading = context.space_data.shading
+        if shading.color_type == 'VERTEX':
+            box.operator("mft.toggle_face_color_display",
+                        text="Hide Face Colors",
+                        icon='HIDE_ON')
+        else:
+            box.operator("mft.toggle_face_color_display",
+                        text="Show Face Colors",
+                        icon='HIDE_OFF')
+
+        box = layout.box()
+        box.label(text="Assign Camera to Selected Faces:")
+
+        # Show camera list
+        row = box.row()
+        row.template_list("MFT_UL_CameraList", "", scene, "mft_cameras",
+                         scene, "mft_camera_index", rows=3)
+
+        # Assign button
+        if scene.mft_camera_index >= 0 and scene.mft_camera_index < len(scene.mft_cameras):
+            camera_item = scene.mft_cameras[scene.mft_camera_index]
+            if camera_item.camera:
+                box.operator("mft.assign_camera_to_faces",
+                           text=f"Assign {camera_item.camera.name}",
+                           icon='BRUSH_DATA')
+        else:
+            box.label(text="Select a camera to assign")
+
 
 def register_properties():    
     pass
@@ -85,6 +142,7 @@ def unregister_properties():
 classes = (
     MFT_UL_CameraList,
     MFT_PT_MainPanel,
+    MFT_PT_NavmeshEditPanel,
 )
 
 def register():

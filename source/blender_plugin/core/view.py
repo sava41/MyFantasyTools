@@ -33,17 +33,21 @@ class View:
 
     _max_pan = 0
     _max_tilt = 0
-    
+    _camera_index = 0
+    _camera_color = (1.0, 1.0, 1.0)
+
     _current_render = RenderType.Main
 
-    def __init__(self, object, output_path, scene):
+    def __init__(self, object, camera_index, output_path, scene):
 
         self._res_x = scene.mft_global_settings.render_width
         self._res_y = scene.mft_global_settings.render_height
-        
+
         self._max_pan = object.max_pan
         self._max_tilt = object.max_tilt
-        
+        self._camera_index = camera_index
+        self._camera_color = tuple(object.color)
+
         camera = object.camera
 
         self._name = camera.name
@@ -193,13 +197,13 @@ class View:
         self._env_camera_obj.location = (point_close + point_far) * 0.5
 
     def __lt__(self, other):
-        return self._main_camera.data["view_id"] < other._main_camera.data["view_id"]
+        return self._camera_index < other._camera_index
 
 
 def create_view_list(cameras, output_path, scene) -> list:
     views = list()
-    for object in cameras:
-        views.append(View(object, output_path, scene))
+    for index, object in enumerate(cameras):
+        views.append(View(object, index, output_path, scene))
 
     if len(views) == 0:
         print("Error: No cameras found")
