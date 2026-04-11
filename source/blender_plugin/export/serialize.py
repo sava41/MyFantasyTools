@@ -9,6 +9,7 @@ from  .data import Triangle
 
 from ..core import view
 from ..core import navmesh as navmesh_module
+from ..core.color import CAMERA_COLOR_ATTR, color_to_comparable
 
 
 def serialize_level(navmesh, views) -> bytearray:
@@ -19,7 +20,7 @@ def serialize_level(navmesh, views) -> bytearray:
     # Create a mapping from camera colors to view indices
     color_to_index = {}
     for view_obj in views:
-        color_key = navmesh_module.color_to_comparable(view_obj._camera_color)
+        color_key = color_to_comparable(view_obj._camera_color)
         color_to_index[color_key] = view_obj._camera_index
 
     # Find adjacent views and set env probe locations
@@ -87,16 +88,19 @@ def serialize_level(navmesh, views) -> bytearray:
         Vec3.CreateVec3(builder, vert.co.x, vert.co.y, vert.co.z)
     navmesh_verts = builder.EndVector()
 
-    # Get face colors from the navmesh using bmesh
+    # Get face colors from the navmesh using bmesh.
+    # CameraColor is a CORNER-domain color attribute; read via loops layer.
     bm = bmesh.new()
     bm.from_mesh(navmesh.object.data)
-    color_layer = bm.faces.layers.color.get("CameraColor")
+    color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
 
     # Build a mapping from polygon index to view index
     polygon_to_view = {}
     if color_layer:
         for face in bm.faces:
-            face_color = navmesh_module.color_to_comparable(face[color_layer])
+            # All loops on a face share the same colour; read the first one.
+            first_loop_color = next(iter(face.loops))[color_layer]
+            face_color = color_to_comparable(first_loop_color)
             if face_color in color_to_index:
                 polygon_to_view[face.index] = color_to_index[face_color]
             else:

@@ -2,22 +2,7 @@ import bpy
 import bmesh
 import mathutils
 
-
-def color_to_comparable(color_rgba):
-    """
-    Convert RGBA color tuple to a comparable format for equality checks.
-    Rounds to 3 decimal places to avoid floating point comparison issues.
-    """
-    return tuple(round(c, 3) for c in color_rgba[:3])
-
-
-def colors_match(color1, color2, tolerance=0.01):
-    """
-    Check if two colors match within a tolerance.
-    """
-    if len(color1) < 3 or len(color2) < 3:
-        return False
-    return all(abs(color1[i] - color2[i]) < tolerance for i in range(3))
+from . color import CAMERA_COLOR_ATTR, color_to_comparable, colors_match, face_color
 
 
 class Navmesh:
@@ -49,8 +34,7 @@ class Navmesh:
         bm = bmesh.new()
         bm.from_mesh(self.object.data)
 
-        # Get the color attribute layer
-        color_layer = bm.faces.layers.color.get("CameraColor")
+        color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
         if not color_layer:
             bm.free()
             return []
@@ -59,27 +43,27 @@ class Navmesh:
 
         # Find all faces matching the current camera color
         current_view_faces = [
-            face for face in bm.faces
-            if colors_match(face[color_layer], camera_color)
+            f for f in bm.faces
+            if colors_match(face_color(f, color_layer), camera_color)
         ]
 
         # Find adjacent faces with different colors
-        for face in current_view_faces:
-            for edge in face.edges:
+        for f in current_view_faces:
+            for edge in f.edges:
                 for adj_face in edge.link_faces:
-                    adj_color = color_to_comparable(adj_face[color_layer])
-                    if not colors_match(adj_face[color_layer], camera_color):
+                    adj_color = color_to_comparable(face_color(adj_face, color_layer))
+                    if not colors_match(face_color(adj_face, color_layer), camera_color):
                         if adj_color in view_index_map:
                             adj_views.append(view_index_map[adj_color])
 
             # Check vertex-edge-vertex adjacency
-            for vert in face.verts:
+            for vert in f.verts:
                 for edge in vert.link_edges:
                     other_vert = edge.other_vert(vert)
-                    if other_vert not in face.verts:
+                    if other_vert not in f.verts:
                         for other_face in other_vert.link_faces:
-                            adj_color = color_to_comparable(other_face[color_layer])
-                            if not colors_match(other_face[color_layer], camera_color):
+                            adj_color = color_to_comparable(face_color(other_face, color_layer))
+                            if not colors_match(face_color(other_face, color_layer), camera_color):
                                 if adj_color in view_index_map:
                                     adj_views.append(view_index_map[adj_color])
 
@@ -101,8 +85,7 @@ class Navmesh:
         bm.from_mesh(self.object.data)
         bm.faces.ensure_lookup_table()
 
-        # Get the color attribute layer
-        color_layer = bm.faces.layers.color.get("CameraColor")
+        color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
         if not color_layer:
             bm.free()
             return [], []
@@ -114,13 +97,13 @@ class Navmesh:
         bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.faces.ensure_lookup_table()
 
-        for face in bm.faces:
-            if colors_match(face[color_layer], camera_color):
+        for f in bm.faces:
+            if colors_match(face_color(f, color_layer), camera_color):
                 # Create a simple object to hold triangle vertex coordinates
-                tri_verts = [vert.co.copy() for vert in face.verts]
+                tri_verts = [vert.co.copy() for vert in f.verts]
                 tri_obj = type('Triangle', (), {'verts': tri_verts})()
                 triangles.append(tri_obj)
-                for vert in face.verts:
+                for vert in f.verts:
                     verts.append([vert.co.x, vert.co.y])
 
         if len(verts) == 0:

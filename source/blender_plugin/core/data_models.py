@@ -1,6 +1,4 @@
 import bpy
-import random
-import colorsys
 from bpy.types import Operator, PropertyGroup
 from bpy.props import (
     StringProperty,
@@ -12,74 +10,10 @@ from bpy.props import (
     FloatVectorProperty
 )
 
+import bmesh
 
-def generate_distinct_color(existing_colors, min_distance=0.3):
-    """
-    Generate an aesthetically pleasing color that is distinct from existing colors.
-    Uses HSV color space with fixed saturation and value for aesthetic consistency.
+from . color import generate_distinct_color, CAMERA_COLOR_ATTR, UNASSIGNED_COLOR, colors_match, face_color
 
-    Args:
-        existing_colors: List of existing RGB colors as tuples (r, g, b)
-        min_distance: Minimum color distance in HSV space
-
-    Returns:
-        RGB color tuple (r, g, b)
-    """
-    max_attempts = 100
-
-    # Use golden ratio for hue distribution to get aesthetically pleasing colors
-    golden_ratio_conjugate = 0.618033988749895
-
-    for attempt in range(max_attempts):
-        if attempt == 0 and len(existing_colors) == 0:
-            # First color: use a nice blue
-            hue = 0.6
-        else:
-            # Use golden ratio to distribute hues evenly
-            hue = (len(existing_colors) * golden_ratio_conjugate) % 1.0
-            # Add small random offset to avoid exact patterns
-            hue = (hue + random.uniform(-0.05, 0.05)) % 1.0
-
-        # Fixed saturation and value for aesthetic consistency
-        saturation = random.uniform(0.6, 0.9)
-        value = random.uniform(0.7, 0.95)
-
-        # Convert to RGB
-        r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
-        new_color = (r, g, b)
-
-        # Check distance from all existing colors
-        if len(existing_colors) == 0:
-            return new_color
-
-        is_distinct = True
-        for existing_color in existing_colors:
-            # Convert existing color to HSV for comparison
-            existing_hsv = colorsys.rgb_to_hsv(*existing_color)
-            new_hsv = (hue, saturation, value)
-
-            # Calculate distance in HSV space
-            # Hue is circular, so we need to handle wrapping
-            hue_dist = min(abs(new_hsv[0] - existing_hsv[0]),
-                          1.0 - abs(new_hsv[0] - existing_hsv[0]))
-            sat_dist = abs(new_hsv[1] - existing_hsv[1])
-            val_dist = abs(new_hsv[2] - existing_hsv[2])
-
-            # Weighted distance (hue is most important for distinction)
-            distance = (hue_dist * 2.0 + sat_dist + val_dist) / 4.0
-
-            if distance < min_distance:
-                is_distinct = False
-                break
-
-        if is_distinct:
-            return new_color
-
-    # If we couldn't find a distinct color, just return a random one
-    # This should rarely happen unless there are many cameras
-    hue = random.random()
-    r, g, b = colorsys.hsv_to_rgb(hue, 0.75, 0.85)
-    return (r, g, b)
 
 class MFT_Camera(PropertyGroup):
     """Group of properties representing a camera in the list"""
@@ -167,7 +101,7 @@ class MFT_OT_AddCamera(Operator):
     bl_idname = "mft.add_camera"
     bl_label = "Add Camera"
     bl_description = "Add the selected camera to the list"
-    
+
     def execute(self, context):
         scene = context.scene
         camera_props = scene.mft_cameras
@@ -207,92 +141,44 @@ class MFT_OT_RemoveCamera(Operator):
         camera_props = scene.mft_cameras
 
         if scene.mft_camera_index >= 0 and scene.mft_camera_index < len(camera_props):
+            removed_color = tuple(camera_props[scene.mft_camera_index].color)
+
+            # Clear this camera's color from navmesh faces before removing
+            navmesh_obj = scene.mft_global_settings.navmesh_object
+            if navmesh_obj and navmesh_obj.type == 'MESH':
+                mesh = navmesh_obj.data
+                in_edit = (context.mode == 'EDIT_MESH' and context.edit_object == navmesh_obj)
+                bm = bmesh.from_edit_mesh(mesh) if in_edit else bmesh.new()
+                if not in_edit:
+                    bm.from_mesh(mesh)
+
+                color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
+                has_remaining = False
+                if color_layer:
+                    for f in bm.faces:
+                        fc = face_color(f, color_layer)
+                        if colors_match(fc, removed_color):
+                            for loop in f.loops:
+                                loop[color_layer] = UNASSIGNED_COLOR
+                        elif not colors_match(fc, UNASSIGNED_COLOR):
+                            has_remaining = True
+
+                if in_edit:
+                    bmesh.update_edit_mesh(mesh)
+                else:
+                    bm.to_mesh(mesh)
+                    mesh.update()
+                    bm.free()
+
+                # If no face assignments remain, turn off vertex color display
+                if not has_remaining:
+                    for space in context.area.spaces:
+                        if space.type == 'VIEW_3D' and space.shading.color_type == 'VERTEX':
+                            space.shading.color_type = 'MATERIAL'
+                            break
+
             camera_props.remove(scene.mft_camera_index)
             scene.mft_camera_index = min(max(0, scene.mft_camera_index - 1), len(camera_props) - 1)
-
-        return {'FINISHED'}
-
-
-class MFT_OT_AssignCameraToFaces(Operator):
-    """Assign selected camera to selected navmesh faces"""
-    bl_idname = "mft.assign_camera_to_faces"
-    bl_label = "Assign Camera to Faces"
-    bl_description = "Assign the selected camera's color to the selected navmesh faces"
-
-    @classmethod
-    def poll(cls, context):
-        return (context.mode == 'EDIT_MESH' and
-                context.scene.mft_camera_index >= 0 and
-                context.scene.mft_camera_index < len(context.scene.mft_cameras))
-
-    def execute(self, context):
-        import bmesh
-
-        scene = context.scene
-        camera_item = scene.mft_cameras[scene.mft_camera_index]
-
-        # Get the active mesh object
-        obj = context.edit_object
-        if not obj or obj.type != 'MESH':
-            self.report({'ERROR'}, "No mesh object in edit mode")
-            return {'CANCELLED'}
-
-        # Get the bmesh from edit mode
-        bm = bmesh.from_edit_mesh(obj.data)
-
-        # Ensure we have a color attribute layer
-        if "CameraColor" not in obj.data.attributes:
-            obj.data.attributes.new(name="CameraColor", type='BYTE_COLOR', domain='FACE')
-
-        # Get the color attribute layer
-        color_layer = bm.faces.layers.color.get("CameraColor")
-        if not color_layer:
-            color_layer = bm.faces.layers.color.new("CameraColor")
-
-        # Get camera color
-        camera_color = camera_item.color
-
-        # Assign color to selected faces
-        selected_faces = [f for f in bm.faces if f.select]
-        if len(selected_faces) == 0:
-            self.report({'WARNING'}, "No faces selected")
-            return {'CANCELLED'}
-
-        for face in selected_faces:
-            # Blender's color layer uses RGBA values (0-1 range)
-            face[color_layer] = (camera_color[0], camera_color[1], camera_color[2], 1.0)
-
-        # Update the mesh
-        bmesh.update_edit_mesh(obj.data)
-
-        self.report({'INFO'}, f"Assigned {camera_item.camera.name} color to {len(selected_faces)} faces")
-        return {'FINISHED'}
-
-
-class MFT_OT_ToggleFaceColorDisplay(Operator):
-    """Toggle face color display in viewport"""
-    bl_idname = "mft.toggle_face_color_display"
-    bl_label = "Toggle Face Color Display"
-    bl_description = "Toggle viewport shading to show camera assignment colors on faces"
-
-    @classmethod
-    def poll(cls, context):
-        return context.edit_object and context.edit_object.type == 'MESH'
-
-    def execute(self, context):
-        # Get the active shading settings
-        shading = context.space_data.shading
-
-        # Toggle color display
-        if shading.color_type == 'VERTEX':
-            # Turn off - return to default
-            shading.color_type = 'MATERIAL'
-            self.report({'INFO'}, "Face color display disabled")
-        else:
-            # Turn on - show vertex colors
-            shading.type = 'SOLID'
-            shading.color_type = 'VERTEX'
-            self.report({'INFO'}, "Face color display enabled")
 
         return {'FINISHED'}
 
@@ -313,8 +199,6 @@ classes = (
     MFT_Camera,
     MFT_OT_AddCamera,
     MFT_OT_RemoveCamera,
-    MFT_OT_AssignCameraToFaces,
-    MFT_OT_ToggleFaceColorDisplay,
 )
 
 def register():
