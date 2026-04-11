@@ -2,6 +2,7 @@ import bpy
 from bpy.types import Panel, UIList
 
 from ..core import data_models
+from ..core.color import CAMERA_COLOR_ATTR
 
 # Camera UIList
 class MFT_UL_CameraList(UIList):
@@ -71,6 +72,11 @@ class MFT_PT_MainPanel(Panel):
         box.label(text="Navmesh")
         box.prop(scene.mft_global_settings, "navmesh_object", text="")
 
+        navmesh_obj = scene.mft_global_settings.navmesh_object
+        has_colors = (navmesh_obj and
+                      navmesh_obj.type == 'MESH' and
+                      navmesh_obj.data.color_attributes.get(CAMERA_COLOR_ATTR) is not None)
+
         shading = context.space_data.shading
         if shading.color_type == 'VERTEX':
             box.operator("mft.toggle_face_color_display",
@@ -78,9 +84,10 @@ class MFT_PT_MainPanel(Panel):
         else:
             box.operator("mft.toggle_face_color_display",
                             text="View Colors", icon='HIDE_OFF')
+            if navmesh_obj and not has_colors:
+                box.label(text="Assign cameras to faces first", icon='INFO')
 
         # Show navmesh editing buttons when in edit mode on the navmesh
-        navmesh_obj = scene.mft_global_settings.navmesh_object
         if (navmesh_obj and
                 context.mode == 'EDIT_MESH' and
                 context.edit_object and

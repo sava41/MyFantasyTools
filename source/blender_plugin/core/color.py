@@ -181,7 +181,12 @@ class MFT_OT_ToggleFaceColorDisplay(Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.edit_object and context.edit_object.type == 'MESH'
+        if not (context.edit_object and context.edit_object.type == 'MESH'):
+            return False
+        # Can always toggle colors off; toggling on requires colors to exist
+        if context.space_data and context.space_data.shading.color_type == 'VERTEX':
+            return True
+        return context.edit_object.data.color_attributes.get(CAMERA_COLOR_ATTR) is not None
 
     def execute(self, context):
         shading = context.space_data.shading
