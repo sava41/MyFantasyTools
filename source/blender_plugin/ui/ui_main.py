@@ -10,10 +10,8 @@ class MFT_UL_CameraList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
         if self.layout_type in {'DEFAULT', 'COMPACT'}:
             row = layout.row(align=True)
-            # Draw colored circle
-            color_box = row.row()
-            color_box.scale_x = 0.3
-            color_box.prop(item, "color", text="")
+            # Draw colored circle (read-only indicator)
+            row.template_node_socket(color=(*item.color, 1.0))
             # Camera name and enabled checkbox
             row.prop(item.camera, "name", text="", emboss=False, icon='CAMERA_DATA')
             row.prop(item, "enabled", text="")
@@ -36,7 +34,7 @@ class MFT_PT_MainPanel(Panel):
 
         # Camera list section
         box = layout.box()
-        box.label(text="Camera List")
+        box.label(text="Cameras")
 
         row = box.row()
         row.template_list("MFT_UL_CameraList", "", scene, "mft_cameras",
