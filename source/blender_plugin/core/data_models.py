@@ -71,16 +71,11 @@ def _teardown_preview():
     except Exception:
         pass
 
-    # Restore render border
+    # Clear render border
     try:
         scene = bpy.data.scenes.get(state['scene_name'])
         if scene:
-            scene.render.use_border = state['saved_use_border']
-            scene.render.use_crop_to_border = state['saved_use_crop']
-            scene.render.border_min_x = state['saved_border_min_x']
-            scene.render.border_max_x = state['saved_border_max_x']
-            scene.render.border_min_y = state['saved_border_min_y']
-            scene.render.border_max_y = state['saved_border_max_y']
+            scene.render.use_border = False
     except Exception:
         pass
 
@@ -151,13 +146,7 @@ def _preview_depsgraph_handler(scene, depsgraph):
         if current_pan > 0.0 or current_tilt > 0.0:
             _setup_render_border(scene, uncropped_fov, uncropped_vfov, fov, vfov)
         else:
-            # No expansion — restore the original border state
-            scene.render.use_border = state['saved_use_border']
-            scene.render.use_crop_to_border = state['saved_use_crop']
-            scene.render.border_min_x = state['saved_border_min_x']
-            scene.render.border_max_x = state['saved_border_max_x']
-            scene.render.border_min_y = state['saved_border_min_y']
-            scene.render.border_max_y = state['saved_border_max_y']
+            scene.render.use_border = False
         state['tracked_fov'] = current_fov
         state['tracked_pan'] = current_pan
         state['tracked_tilt'] = current_tilt
@@ -427,12 +416,6 @@ class MFT_OT_SetViewportCamera(Operator):
                 'tracked_tilt': camera_item.max_tilt,
                 'tracked_res_x': res_x,
                 'tracked_res_y': res_y,
-                'saved_use_border': scene.render.use_border,
-                'saved_use_crop': scene.render.use_crop_to_border,
-                'saved_border_min_x': scene.render.border_min_x,
-                'saved_border_max_x': scene.render.border_max_x,
-                'saved_border_min_y': scene.render.border_min_y,
-                'saved_border_max_y': scene.render.border_max_y,
             }
 
             scene.render.resolution_x = max(1, int(
