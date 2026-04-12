@@ -144,6 +144,10 @@ def _preview_depsgraph_handler(scene, depsgraph):
             fov, aspect, current_pan, current_tilt
         )
         preview_obj.data.angle = uncropped_fov
+        scene.render.resolution_x = max(1, int(
+            res_x * math.tan(uncropped_fov * 0.5) / math.tan(fov * 0.5)))
+        scene.render.resolution_y = max(1, int(
+            res_y * math.tan(uncropped_vfov * 0.5) / math.tan(vfov * 0.5)))
         if current_pan > 0.0 or current_tilt > 0.0:
             _setup_render_border(scene, uncropped_fov, uncropped_vfov, fov, vfov)
         else:
@@ -430,6 +434,11 @@ class MFT_OT_SetViewportCamera(Operator):
                 'saved_border_min_y': scene.render.border_min_y,
                 'saved_border_max_y': scene.render.border_max_y,
             }
+
+            scene.render.resolution_x = max(1, int(
+                res_x * math.tan(uncropped_fov * 0.5) / math.tan(fov * 0.5)))
+            scene.render.resolution_y = max(1, int(
+                res_y * math.tan(uncropped_vfov * 0.5) / math.tan(vfov * 0.5)))
 
             if camera_item.max_pan > 0.0 or camera_item.max_tilt > 0.0:
                 _setup_render_border(scene, uncropped_fov, uncropped_vfov, fov, vfov)
