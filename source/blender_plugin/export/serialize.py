@@ -1,4 +1,5 @@
 import flatbuffers
+import bmesh
 
 from . data import Vec3
 from . data import Mat4
@@ -7,7 +8,8 @@ from . data import Level
 from  .data import Triangle
 
 from ..core import view
-from ..core import navmesh
+from ..core import navmesh as navmesh_module
+from ..core.color import CAMERA_COLOR_ATTR, color_to_comparable
 
 
 def serialize_level(navmesh, views) -> bytearray:
@@ -15,10 +17,17 @@ def serialize_level(navmesh, views) -> bytearray:
     if navmesh is None or views is None:
         return None
 
-    for i, view in enumerate(views):
-        view._adjacent_views = navmesh.find_adjacent_views(i)
-        tris = navmesh.get_view_id_tris(i)
-        view.set_env_probe_location(tris)
+    # Create a mapping from camera colors to view indices
+    color_to_index = {}
+    for view_obj in views:
+        color_key = color_to_comparable(view_obj._camera_color)
+        color_to_index[color_key] = view_obj._camera_index
+
+    # Find adjacent views and set env probe locations
+    for view_obj in views:
+        view_obj._adjacent_views = navmesh.find_adjacent_views(view_obj._camera_color, color_to_index)
+        tris = navmesh.get_view_color_tris(view_obj._camera_color)
+        view_obj.set_env_probe_location(tris)
 
     builder = flatbuffers.Builder(4096)
 
@@ -79,14 +88,35 @@ def serialize_level(navmesh, views) -> bytearray:
         Vec3.CreateVec3(builder, vert.co.x, vert.co.y, vert.co.z)
     navmesh_verts = builder.EndVector()
 
+    # Get face colors from the navmesh using bmesh.
+    # CameraColor is a CORNER-domain color attribute; read via loops layer.
+    bm = bmesh.new()
+    bm.from_mesh(navmesh.object.data)
+    color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
+
+    # Build a mapping from polygon index to view index
+    polygon_to_view = {}
+    if color_layer:
+        for face in bm.faces:
+            # All loops on a face share the same colour; read the first one.
+            first_loop_color = next(iter(face.loops))[color_layer]
+            face_color = color_to_comparable(first_loop_color)
+            if face_color in color_to_index:
+                polygon_to_view[face.index] = color_to_index[face_color]
+            else:
+                # Default to 0 if no color match found
+                polygon_to_view[face.index] = 0
+
+    bm.free()
+
     Level.StartNavmeshTrisVector(
         builder, len(navmesh.object.data.loop_triangles)
     )
 
     for tri in reversed(navmesh.object.data.loop_triangles):
-        view_index = (
-            navmesh.object.data.attributes["Views"].data[tri.polygon_index].value
-        )
+        # Get view index from polygon color mapping
+        view_index = polygon_to_view.get(tri.polygon_index, 0)
+
         Triangle.CreateTriangle(
             builder,
             tri.vertices[0],

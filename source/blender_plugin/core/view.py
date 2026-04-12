@@ -5,6 +5,50 @@ from enum import Enum
 
 from .composite import *
 
+
+def compute_uncropped_fov(fov, aspect, max_pan, max_tilt):
+    """Compute the expanded FOV needed to accommodate max pan/tilt rotation.
+
+    Rotates each corner of the original frustum by max_tilt then max_pan and
+    finds the maximum angular extents, giving the smallest enclosing FOV.
+
+    Args:
+        fov:      Original horizontal FOV in radians
+        aspect:   Render aspect ratio (height / width)
+        max_pan:  Maximum pan angle in radians
+        max_tilt: Maximum tilt angle in radians
+
+    Returns:
+        (uncropped_fov, uncropped_vfov, vfov) all in radians
+    """
+    vfov = 2.0 * math.atan(math.tan(fov * 0.5) * aspect)
+    hfov_half = fov * 0.5
+    vfov_half = vfov * 0.5
+
+    max_angle_h = 0.0
+    max_angle_v = 0.0
+
+    for corner_h in (-hfov_half, hfov_half):
+        for corner_v in (-vfov_half, vfov_half):
+            corner_dir = mathutils.Vector((
+                math.sin(corner_h) * math.cos(corner_v),
+                math.sin(corner_v),
+                -math.cos(corner_h) * math.cos(corner_v),
+            ))
+            rot_pan = mathutils.Matrix.Rotation(max_pan, 3, 'Y')
+            rot_tilt = mathutils.Matrix.Rotation(max_tilt, 3, 'X')
+            rotated = rot_pan @ rot_tilt @ corner_dir
+
+            horiz = math.sqrt(rotated.x ** 2 + rotated.z ** 2)
+            angle_h = abs(math.atan2(rotated.x, -rotated.z))
+            angle_v = abs(math.atan2(rotated.y, horiz))
+
+            max_angle_h = max(max_angle_h, angle_h)
+            max_angle_v = max(max_angle_v, angle_v)
+
+    return max_angle_h * 2.0, max_angle_v * 2.0, vfov
+
+
 #TODO: should to merge this and the MFT_Camera class at some point
 class View:
     class RenderType(Enum):
@@ -33,17 +77,21 @@ class View:
 
     _max_pan = 0
     _max_tilt = 0
-    
+    _camera_index = 0
+    _camera_color = (1.0, 1.0, 1.0)
+
     _current_render = RenderType.Main
 
-    def __init__(self, object, output_path, scene):
+    def __init__(self, object, camera_index, output_path, scene):
 
         self._res_x = scene.mft_global_settings.render_width
         self._res_y = scene.mft_global_settings.render_height
-        
+
         self._max_pan = object.max_pan
         self._max_tilt = object.max_tilt
-        
+        self._camera_index = camera_index
+        self._camera_color = tuple(object.color)
+
         camera = object.camera
 
         self._name = camera.name
@@ -55,42 +103,9 @@ class View:
         self._fov = camera.data.angle
         self._render_output_path = output_path + "//renders//" + camera.name
 
-        # Compute actual FOV needed by checking rotated frustum corners
-        hfov_half = camera.data.angle * 0.5
-        vfov = 2 * math.atan( math.tan(camera.data.angle * 0.5) * self._aspect )
-        vfov_half = vfov * 0.5
-
-        # Check all 4 corners at max rotation to find required FOV
-        max_angle_h = 0
-        max_angle_v = 0
-
-        for corner_h in [-hfov_half, hfov_half]:
-            for corner_v in [-vfov_half, vfov_half]:
-                # Create corner ray direction
-                corner_dir = mathutils.Vector((
-                    math.sin(corner_h) * math.cos(corner_v),
-                    math.sin(corner_v),
-                    -math.cos(corner_h) * math.cos(corner_v)
-                ))
-
-                # Rotate by max pan (around Y axis)
-                rot_pan = mathutils.Matrix.Rotation(object.max_pan, 3, 'Y')
-                # Rotate by max tilt (around X axis)
-                rot_tilt = mathutils.Matrix.Rotation(object.max_tilt, 3, 'X')
-
-                # Apply rotations (order matters: tilt then pan)
-                rotated_dir = rot_pan @ rot_tilt @ corner_dir
-
-                # Compute angles from optical axis
-                horizontal_dist = math.sqrt(rotated_dir.x**2 + rotated_dir.z**2)
-                angle_h = abs(math.atan2(rotated_dir.x, -rotated_dir.z))
-                angle_v = abs(math.atan2(rotated_dir.y, horizontal_dist))
-
-                max_angle_h = max(max_angle_h, angle_h)
-                max_angle_v = max(max_angle_v, angle_v)
-
-        self._uncropped_fov = max_angle_h * 2.0
-        uncropped_vfov = max_angle_v * 2.0
+        self._uncropped_fov, uncropped_vfov, vfov = compute_uncropped_fov(
+            camera.data.angle, self._aspect, object.max_pan, object.max_tilt
+        )
 
         self._uncropped_res_x = self._res_x / self._fov * self._uncropped_fov
         self._uncropped_res_y = self._res_y / vfov * uncropped_vfov
@@ -193,13 +208,13 @@ class View:
         self._env_camera_obj.location = (point_close + point_far) * 0.5
 
     def __lt__(self, other):
-        return self._main_camera.data["view_id"] < other._main_camera.data["view_id"]
+        return self._camera_index < other._camera_index
 
 
 def create_view_list(cameras, output_path, scene) -> list:
     views = list()
-    for object in cameras:
-        views.append(View(object, output_path, scene))
+    for index, object in enumerate(cameras):
+        views.append(View(object, index, output_path, scene))
 
     if len(views) == 0:
         print("Error: No cameras found")

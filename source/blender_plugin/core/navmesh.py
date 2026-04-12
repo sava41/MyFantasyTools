@@ -2,6 +2,8 @@ import bpy
 import bmesh
 import mathutils
 
+from . color import CAMERA_COLOR_ATTR, color_to_comparable, colors_match, face_color
+
 
 class Navmesh:
     def __init__(self, object):
@@ -18,54 +20,95 @@ class Navmesh:
         bpy.ops.object.mode_set(mode="OBJECT")
         bpy.ops.object.select_all(action="DESELECT")
 
-    def find_adjacent_views(self, view_id) -> list:
+    def find_adjacent_views(self, camera_color, view_index_map) -> list:
+        """
+        Find adjacent views by camera color.
+
+        Args:
+            camera_color: RGB tuple of the camera color to find adjacencies for
+            view_index_map: Dictionary mapping camera colors to view indices
+
+        Returns:
+            List of adjacent view indices
+        """
         bm = bmesh.new()
         bm.from_mesh(self.object.data)
-        view_attribute = bm.faces.layers.int["Views"]
+
+        color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
+        if not color_layer:
+            bm.free()
+            return []
 
         adj_views = list()
 
-        current_view_faces = [face for face in bm.faces if face[view_attribute] is view_id]
+        # Find all faces matching the current camera color
+        current_view_faces = [
+            f for f in bm.faces
+            if colors_match(face_color(f, color_layer), camera_color)
+        ]
 
-        for face in current_view_faces:
-            for edge in face.edges:
+        # Find adjacent faces with different colors
+        for f in current_view_faces:
+            for edge in f.edges:
                 for adj_face in edge.link_faces:
-                    if adj_face[view_attribute] is not view_id:
-                        adj_views.append(adj_face[view_attribute])
+                    adj_color = color_to_comparable(face_color(adj_face, color_layer))
+                    if not colors_match(face_color(adj_face, color_layer), camera_color):
+                        if adj_color in view_index_map:
+                            adj_views.append(view_index_map[adj_color])
 
             # Check vertex-edge-vertex adjacency
-            for vert in face.verts:
+            for vert in f.verts:
                 for edge in vert.link_edges:
                     other_vert = edge.other_vert(vert)
-                    if other_vert not in face.verts:
+                    if other_vert not in f.verts:
                         for other_face in other_vert.link_faces:
-                            if other_face[view_attribute] is not view_id:
-                                adj_views.append(other_face[view_attribute])
+                            adj_color = color_to_comparable(face_color(other_face, color_layer))
+                            if not colors_match(face_color(other_face, color_layer), camera_color):
+                                if adj_color in view_index_map:
+                                    adj_views.append(view_index_map[adj_color])
 
         bm.free()
 
-        return set(adj_views)
+        return list(set(adj_views))
 
-    def get_view_id_tris(self, view_id) -> tuple:
+    def get_view_color_tris(self, camera_color) -> tuple:
+        """
+        Get triangles and convex hull for faces matching a camera color.
+
+        Args:
+            camera_color: RGB tuple of the camera color
+
+        Returns:
+            Tuple of (triangles list, convex_hull_2d list)
+        """
         bm = bmesh.new()
         bm.from_mesh(self.object.data)
         bm.faces.ensure_lookup_table()
-        view_attribute = bm.faces.layers.int["Views"]
+
+        color_layer = bm.loops.layers.float_color.get(CAMERA_COLOR_ATTR)
+        if not color_layer:
+            bm.free()
+            return [], []
 
         verts = list()
         triangles = list()
+
         # Triangulate the bmesh
         bmesh.ops.triangulate(bm, faces=bm.faces)
         bm.faces.ensure_lookup_table()
 
-        for face in bm.faces:
-            if face[view_attribute] is view_id:
+        for f in bm.faces:
+            if colors_match(face_color(f, color_layer), camera_color):
                 # Create a simple object to hold triangle vertex coordinates
-                tri_verts = [vert.co.copy() for vert in face.verts]
+                tri_verts = [vert.co.copy() for vert in f.verts]
                 tri_obj = type('Triangle', (), {'verts': tri_verts})()
                 triangles.append(tri_obj)
-                for vert in face.verts:
+                for vert in f.verts:
                     verts.append([vert.co.x, vert.co.y])
+
+        if len(verts) == 0:
+            bm.free()
+            return triangles, []
 
         vert_indicies = mathutils.geometry.convex_hull_2d(verts)
 
