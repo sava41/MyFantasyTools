@@ -2,8 +2,8 @@ import bpy
 from bpy.types import Operator
 
 import os
+import struct
 from pathlib import Path
-import shutil
 import threading
 
 from . import render
@@ -24,6 +24,7 @@ class MFT_OT_Export(Operator):
     _og_scene = None
     _render_scene = None
     _views = []
+    _navmesh = None
     _jxl_threads = []
     _comp_manager = None
     _next_index = False
@@ -33,9 +34,9 @@ class MFT_OT_Export(Operator):
 
             if context.scene.mft_global_settings.cancel_rendering:
                 self.cancel(context)
-            
+
             if not context.scene.mft_global_settings.is_rendering:
-                
+
                 wm = context.window_manager
                 if self._timer:
                     wm.event_timer_remove(self._timer)
@@ -56,31 +57,47 @@ class MFT_OT_Export(Operator):
 
                 output_path_root = Path(bpy.path.abspath(context.scene.mft_global_settings.export_directory))
                 output_path_final = output_path_root / "data"
-                
+
                 for t in self._jxl_threads:
                     t.join()
-                
-                # Zip data
-                shutil.make_archive(
-                    str((output_path_root / "mft_level_data").resolve()),
-                    format="zip",
-                    root_dir=str(output_path_final.resolve()),
-                )
 
                 level_name = bpy.path.display_name_from_filepath(bpy.data.filepath)
-
                 if not level_name:
                     level_name = "new_level"
 
-                os.rename(
-                    (output_path_root / "mft_level_data.zip").resolve(),
-                    (output_path_root / (level_name + ".mflevel")).resolve(),
-                )
-                
+                # Collect JXL files in view order and build the image blob.
+                output_path_views = output_path_final / "views"
+                image_blob = bytearray()
+                image_entries = {}  # {view_name: {type_name: (offset, size)}}
+
+                IMAGE_TYPES = ['ColorDirect', 'ColorIndirect', 'Depth', 'Environment', 'LightDirection']
+                for view in self._views:
+                    entries = {}
+                    for type_name in IMAGE_TYPES:
+                        jxl_path = output_path_views / f"{view._name}_{type_name}.jxl"
+                        if jxl_path.exists():
+                            data = jxl_path.read_bytes()
+                            entries[type_name] = (len(image_blob), len(data))
+                            image_blob.extend(data)
+                    image_entries[view._name] = entries
+
+                # Serialize the FlatBuffer with image offsets embedded.
+                flatbuffer_bytes = serialize.serialize_level(self._navmesh, self._views, image_entries)
+
+                # Write the .mflevel binary file:
+                #   4-byte LE size prefix | FlatBuffer ("MFLV" identifier at bytes [8..11]) | image blob
+                size_prefix = struct.pack('<I', len(flatbuffer_bytes))
+
+                output_file = output_path_root / (level_name + ".mflevel")
+                with open(output_file, 'wb') as f:
+                    f.write(size_prefix)
+                    f.write(bytes(flatbuffer_bytes))
+                    f.write(image_blob)
+
                 return {'FINISHED'}
 
             if not bpy.app.is_job_running('RENDER'):
-                
+
                 if self._next_index:
                     prev_view = self._views[context.scene.mft_global_settings.current_view]
 
@@ -93,7 +110,7 @@ class MFT_OT_Export(Operator):
                     t.start()
 
                     self._jxl_threads.append(t)
-                    
+
                     context.scene.mft_global_settings.current_view += 1
                     self._next_index = False
 
@@ -108,7 +125,7 @@ class MFT_OT_Export(Operator):
                 if view is None:
                     context.scene.mft_global_settings.cancel_rendering = True
                     return {'PASS_THROUGH'}
-                
+
                 view.set_next_camera_active(self._render_scene, self._comp_manager)
                 bpy.ops.render.render('INVOKE_DEFAULT', write_still=False, scene=self._render_scene.name)
 
@@ -121,7 +138,7 @@ class MFT_OT_Export(Operator):
         scene = context.scene
         export_path_root = Path(bpy.path.abspath(scene.mft_global_settings.export_directory))
         export_path_final = export_path_root / "data"
-        
+
         cameras = scene.mft_cameras
 
         if scene.mft_global_settings.is_rendering:
@@ -133,32 +150,28 @@ class MFT_OT_Export(Operator):
         if not export_path_root:
             self.report({'ERROR'}, "Please specify an export path")
             return {'CANCELLED'}
-        
+
         if not os.path.exists(export_path_root):
             self.report({'ERROR'}, f"Could not create directory: {export_path_root}")
             return {'CANCELLED'}
-        
+
         if not scene.mft_global_settings.navmesh_object:
             self.report({'ERROR'}, "Please specify a target mesh object")
             return {'CANCELLED'}
-        
+
         if len(cameras) == 0:
             self.report({'ERROR'}, "No cameras in the list")
             return {'CANCELLED'}
-        
+
         enabled_cameras = [item for item in cameras if item.enabled and item.camera]
         if len(enabled_cameras) == 0:
             self.report({'ERROR'}, "No enabled cameras in the list")
             return {'CANCELLED'}
 
         self._views = create_view_list(enabled_cameras, str(export_path_root.resolve()), scene)
-        navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
+        self._navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
 
         os.makedirs(export_path_final, exist_ok=True)
-
-        level_data_buffer = serialize.serialize_level(navmesh, self._views)
-        with open(export_path_final / (scene.mft_global_settings.navmesh_object.name + ".level"), "wb") as file:
-            file.write(level_data_buffer)
 
         # Create dummy scene for rendering
         self._og_scene = scene
@@ -181,21 +194,21 @@ class MFT_OT_Export(Operator):
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.2, window=context.window)
         wm.modal_handler_add(self)
-        
+
         self.report({'INFO'}, f"Starting render of {len(cameras)} views")
-        
+
         return {'RUNNING_MODAL'}
-    
-    def cancel(self, context):        
+
+    def cancel(self, context):
         context.scene.mft_global_settings.is_rendering = False
         context.scene.mft_global_settings.cancel_rendering = False
-    
+
 class RENDER_OT_Cancel(Operator):
     """cancel export all mft data"""
     bl_idname = "mft.cancel"
     bl_label = "Cancel"
     bl_description = "Cancel export mft level"
-    
+
     def execute(self, context):
         context.scene.mft_global_settings.cancel_rendering = True
         self.report({'INFO'}, "Render cancelled")

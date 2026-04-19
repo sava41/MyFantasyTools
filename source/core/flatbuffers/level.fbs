@@ -33,6 +33,12 @@ struct Triangle {
   material_id: uint16;
 }
 
+// Byte range of a single image within the .mflevel image blob.
+table ImageEntry {
+  offset: uint64;
+  size:   uint64;
+}
+
 table View {
   name: string;
   world_transform: Mat4;
@@ -41,21 +47,30 @@ table View {
   fov: float;
   res_x: uint16;
   res_y: uint16;
-  
+
   max_pan: float;
   max_tilt: float;
-  
+
   adjacent_views: [uint16];
+
+  // Image entries for the .mflevel binary format (byte offsets into the image blob).
+  color_direct:    ImageEntry;
+  color_indirect:  ImageEntry;
+  depth:           ImageEntry;
+  environment:     ImageEntry;
+  light_direction: ImageEntry;
 }
 
 table Level {
   name: string;
-  data_path: string;
+  data_path: string;     // legacy: relative path to image directory used by .level format
   target_res_x: uint16;
   target_res_y: uint16;
   views: [View];
   navmesh_verts: [Vec3];
   navmesh_tris: [Triangle];
+  uuid: string;          // UUID v4 assigned at export time (36-char canonical form)
 }
 
 root_type Level;
+file_identifier "MFLV";

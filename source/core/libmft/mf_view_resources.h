@@ -4,6 +4,8 @@
 #include "level_generated.h"
 
 #include <array>
+#include <atomic>
+#include <cstddef>
 #include <filesystem>
 #include <map>
 #include <memory>
@@ -39,6 +41,9 @@ namespace mft
         ViewResources& operator=( ViewResources&& )      = delete;
 
         void init( const mft::data::View* view_info, const std::filesystem::path& data_dir );
+        // Init for .mflevel: image data is read from an in-memory blob using
+        // byte offsets stored in the FlatBuffer view_info.
+        void init( const mft::data::View* view_info, const char* image_blob, size_t image_blob_size );
 
         bool is_data_loaded() const;
         bool load_image_data();
@@ -61,6 +66,9 @@ namespace mft
       private:
         std::unordered_map<ImageType, std::filesystem::path> m_image_paths;
         std::unordered_map<ImageType, void*> m_image_buffers;
+
+        const char* m_image_blob_ptr  = nullptr; // non-null when loading from .mflevel
+        size_t      m_image_blob_size = 0;
 
         std::atomic<unsigned int> m_is_init;
         std::atomic<unsigned int> m_images_loaded;

@@ -31,6 +31,7 @@ namespace mft
         const mft::data::Level* m_level_info = nullptr;
 
         std::filesystem::path m_data_file_path;
+        std::vector<char> m_image_blob; // populated when loading from .mflevel
     };
 
 } // namespace mft

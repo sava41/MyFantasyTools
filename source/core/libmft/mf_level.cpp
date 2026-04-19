@@ -10,16 +10,26 @@ namespace mft
     {
         const std::filesystem::path level_file_path( path );
 
-        m_data_buffer = read_binary( level_file_path );
-
-        if( m_data_buffer.empty() )
+        if( level_file_path.extension() == ".mflevel" )
         {
-            return false;
-        }
+            m_image_blob.clear();
+            if( !read_mflevel( level_file_path, m_data_buffer, m_image_blob ) )
+                return false;
 
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-        m_data_file_path  = level_file_path.parent_path() / std::filesystem::path( level->data_path()->str() );
-        printf( "Data path: %s\n", level->data_path()->c_str() );
+            m_data_file_path = {};
+        }
+        else
+        {
+            m_image_blob.clear();
+            m_data_buffer = read_binary( level_file_path );
+
+            if( m_data_buffer.empty() )
+                return false;
+
+            const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
+            m_data_file_path  = level_file_path.parent_path() / std::filesystem::path( level->data_path()->str() );
+            printf( "Data path: %s\n", level->data_path()->c_str() );
+        }
 
         m_level_info = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
 
@@ -41,7 +51,10 @@ namespace mft
         {
             const auto* const view_info = views->Get( i );
 
-            view_resources.at( i )->init( view_info, m_data_file_path );
+            if( !m_image_blob.empty() )
+                view_resources.at( i )->init( view_info, m_image_blob.data(), m_image_blob.size() );
+            else
+                view_resources.at( i )->init( view_info, m_data_file_path );
 
             view_resources.at( i )->load_image_data();
             view_resources.at( i )->load_camera_data();
