@@ -4,6 +4,8 @@
 #include "io.h"
 #include "jxl.h"
 
+#include <fstream>
+
 namespace mft
 {
 
@@ -21,9 +23,9 @@ namespace mft
 
     void ViewResources::init( const mft::data::View* view_info, const std::filesystem::path& data_dir )
     {
-        m_view_info       = view_info;
-        m_image_blob_ptr  = nullptr;
-        m_image_blob_size = 0;
+        m_view_info         = view_info;
+        m_mflevel_path      = {};
+        m_blob_start_offset = 0;
 
         // TODO: for now views have hardcoded channels
         m_image_type_flags = ColorDirect | ColorIndirect | Depth | Environment | LightDirection;
@@ -42,11 +44,11 @@ namespace mft
         m_is_init = true;
     }
 
-    void ViewResources::init( const mft::data::View* view_info, const char* image_blob, size_t image_blob_size )
+    void ViewResources::init( const mft::data::View* view_info, const std::filesystem::path& mflevel_path, size_t blob_start_offset )
     {
-        m_view_info       = view_info;
-        m_image_blob_ptr  = image_blob;
-        m_image_blob_size = image_blob_size;
+        m_view_info         = view_info;
+        m_mflevel_path      = mflevel_path;
+        m_blob_start_offset = blob_start_offset;
 
         // TODO: for now views have hardcoded channels
         m_image_type_flags = ColorDirect | ColorIndirect | Depth | Environment | LightDirection;
@@ -59,25 +61,38 @@ namespace mft
         if( m_images_loaded || !m_is_init )
             return false;
 
-        if( m_image_blob_ptr )
+        if( !m_mflevel_path.empty() )
         {
-            // .mflevel path: read each image from the in-memory blob using offsets
-            // stored in the FlatBuffer view entry.
+            // .mflevel path: seek to each image's position in the file on demand.
+            std::ifstream file( m_mflevel_path, std::ios::binary );
+            if( !file.good() )
+            {
+                fprintf( stderr, "Could not open %s for image loading\n", m_mflevel_path.string().c_str() );
+                return false;
+            }
+
             auto load_image = [&]( ImageType type, const data::ImageEntry* entry ) -> bool
             {
                 if( !entry )
                     return true; // field absent, skip
 
-                const auto offset = static_cast<size_t>( entry->offset() );
-                const auto size   = static_cast<size_t>( entry->size() );
+                const size_t offset = static_cast<size_t>( entry->offset() );
+                const size_t size   = static_cast<size_t>( entry->size() );
 
-                if( offset + size > m_image_blob_size )
+                file.seekg( static_cast<std::streamoff>( m_blob_start_offset + offset ) );
+                if( !file.good() )
                 {
-                    fprintf( stderr, "Image entry out of bounds for view '%s'\n", m_view_info->name()->c_str() );
+                    fprintf( stderr, "Seek failed for view '%s'\n", m_view_info->name()->c_str() );
                     return false;
                 }
 
-                std::vector<char> compressed( m_image_blob_ptr + offset, m_image_blob_ptr + offset + size );
+                std::vector<char> compressed( size );
+                file.read( compressed.data(), static_cast<std::streamsize>( size ) );
+                if( !file.good() )
+                {
+                    fprintf( stderr, "Read failed for view '%s'\n", m_view_info->name()->c_str() );
+                    return false;
+                }
 
                 bool res = jxl::decode_oneshot( compressed,
                     [this, type]( int sizex, int sizey, int channels, size_t buffer_size ) -> void*

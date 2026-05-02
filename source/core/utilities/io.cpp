@@ -51,7 +51,7 @@ namespace mft
 
     bool read_mflevel( const std::filesystem::path& path,
                        std::vector<char>&           flatbuffer_out,
-                       std::vector<char>&           image_blob_out )
+                       size_t&                      blob_start_out )
     {
         std::ifstream file( path, std::ios::binary | std::ios::in );
         if( !file.good() )
@@ -84,7 +84,8 @@ namespace mft
             return false;
         }
 
-        image_blob_out.assign( std::istreambuf_iterator<char>( file ), {} );
+        // Image blob starts immediately after the size prefix + FlatBuffer.
+        blob_start_out = sizeof( uint32_t ) + fb_size;
 
         return true;
     }

@@ -12,15 +12,15 @@ namespace mft
 
         if( level_file_path.extension() == ".mflevel" )
         {
-            m_image_blob.clear();
-            if( !read_mflevel( level_file_path, m_data_buffer, m_image_blob ) )
+            if( !read_mflevel( level_file_path, m_data_buffer, m_blob_start_offset ) )
                 return false;
 
+            m_mflevel_path   = level_file_path;
             m_data_file_path = {};
         }
         else
         {
-            m_image_blob.clear();
+            m_mflevel_path = {};
             m_data_buffer = read_binary( level_file_path );
 
             if( m_data_buffer.empty() )
@@ -51,15 +51,15 @@ namespace mft
         {
             const auto* const view_info = views->Get( i );
 
-            if( !m_image_blob.empty() )
-                view_resources.at( i )->init( view_info, m_image_blob.data(), m_image_blob.size() );
+            if( !m_mflevel_path.empty() )
+                view_resources.at( i )->init( view_info, m_mflevel_path, m_blob_start_offset );
             else
                 view_resources.at( i )->init( view_info, m_data_file_path );
 
-            view_resources.at( i )->load_image_data();
+            // Image data is loaded on demand by ViewLevelManager::set_current_view.
             view_resources.at( i )->load_camera_data();
 
-            printf( "loaded %s\n", view_info->name()->c_str() );
+            printf( "initialized %s\n", view_info->name()->c_str() );
         }
 
         return true;

@@ -25,10 +25,13 @@ namespace mft
 
     inline constexpr char MFLEVEL_MAGIC[] = "MFLV";
 
-    // Read a .mflevel file. On success the FlatBuffer bytes are written to
-    // flatbuffer_out and the image blob bytes are written to image_blob_out.
+    // Read the header and FlatBuffer section of a .mflevel file.
+    // On success flatbuffer_out contains the FlatBuffer bytes and blob_start_out
+    // is set to the byte offset within the file where the image blob begins.
+    // Images are NOT loaded into memory — callers seek to
+    //   blob_start_out + entry->offset()  and read  entry->size()  bytes on demand.
     bool read_mflevel( const std::filesystem::path& path,
                        std::vector<char>&           flatbuffer_out,
-                       std::vector<char>&           image_blob_out );
+                       size_t&                      blob_start_out );
 
 } // namespace mft

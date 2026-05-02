@@ -30,8 +30,9 @@ namespace mft
         std::vector<char> m_data_buffer;
         const mft::data::Level* m_level_info = nullptr;
 
-        std::filesystem::path m_data_file_path;
-        std::vector<char> m_image_blob; // populated when loading from .mflevel
+        std::filesystem::path m_data_file_path;   // set for legacy .level format
+        std::filesystem::path m_mflevel_path;     // set when loading from .mflevel
+        size_t                m_blob_start_offset = 0; // byte offset of image blob in .mflevel
     };
 
 } // namespace mft

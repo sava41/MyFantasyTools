@@ -65,9 +65,33 @@ int main( int argc, char* argv[] )
         return 1;
     }
 
-    printf( "there are %d cameras in this scene\n", manager.get_num_views() );
+    const int num_views = manager.get_num_views();
+    printf( "there are %d cameras in this scene\n", num_views );
     printf( "there are %d triangles in the navmesh\n", manager.get_navmesh_num_tris() );
 
-    printf( "fini" );
+    if( num_views == 0 )
+    {
+        printf( "no views to load\n" );
+        return 0;
+    }
+
+    // Simulate moving through every view in sequence.
+    // set_current_view loads images within 2 hops and frees the rest.
+    for( int i = 0; i < num_views; ++i )
+    {
+        printf( "moving to view %d\n", i );
+        manager.set_current_view( i );
+
+        const std::vector<int> neighbours = manager.get_adjacent_views( i );
+        printf( "  adjacent views:" );
+        for( int adj : neighbours )
+            printf( " %d", adj );
+        printf( "\n" );
+
+        printf( "  view %d images loaded: %s\n", i,
+                manager.get_view( i )->is_data_loaded() ? "yes" : "no" );
+    }
+
+    printf( "fini\n" );
     return 0;
 }

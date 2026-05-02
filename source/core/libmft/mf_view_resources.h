@@ -41,9 +41,9 @@ namespace mft
         ViewResources& operator=( ViewResources&& )      = delete;
 
         void init( const mft::data::View* view_info, const std::filesystem::path& data_dir );
-        // Init for .mflevel: image data is read from an in-memory blob using
-        // byte offsets stored in the FlatBuffer view_info.
-        void init( const mft::data::View* view_info, const char* image_blob, size_t image_blob_size );
+        // Init for .mflevel: images are read on demand from the file by seeking
+        // to  blob_start_offset + entry->offset()  and reading  entry->size()  bytes.
+        void init( const mft::data::View* view_info, const std::filesystem::path& mflevel_path, size_t blob_start_offset );
 
         bool is_data_loaded() const;
         bool load_image_data();
@@ -67,8 +67,8 @@ namespace mft
         std::unordered_map<ImageType, std::filesystem::path> m_image_paths;
         std::unordered_map<ImageType, void*> m_image_buffers;
 
-        const char* m_image_blob_ptr  = nullptr; // non-null when loading from .mflevel
-        size_t      m_image_blob_size = 0;
+        std::filesystem::path m_mflevel_path;        // set when loading from .mflevel
+        size_t                m_blob_start_offset = 0;
 
         std::atomic<unsigned int> m_is_init;
         std::atomic<unsigned int> m_images_loaded;
