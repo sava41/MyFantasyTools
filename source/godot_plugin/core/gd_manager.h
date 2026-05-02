@@ -2,10 +2,8 @@
 
 #include "gd_view_resources.h"
 
-#include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/object.hpp>
-#include <godot_cpp/templates/vector.hpp>
 #include <mf_view_level_manager.h>
 
 class MFManager : public godot::Object
@@ -23,11 +21,12 @@ class MFManager : public godot::Object
         return m_static_inst;
     }
 
+    // Load (or swap to) the level at path. If path is already active, no-op.
     bool load( const godot::String& path );
 
-    godot::String get_current_level();
-    int get_num_views();
-    int get_closest_view_Id( const godot::Vector3& point );
+    godot::String get_active_path() const;
+    int get_num_views() const;
+    int get_closest_view_id( const godot::Vector3& point ) const;
     const std::unique_ptr<GDViewResources>& get_view_data( int viewId );
     godot::PackedVector3Array get_navmesh();
 
@@ -36,7 +35,6 @@ class MFManager : public godot::Object
   private:
     static inline MFManager* m_static_inst = nullptr;
     mft::ViewLevelManager<GDViewResources> m_manager;
-    int m_currentViewId;
-
-    godot::String m_currentLevel;
+    godot::String m_activePath;
+    int m_currentViewId = -1;
 };

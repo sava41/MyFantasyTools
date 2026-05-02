@@ -31,7 +31,7 @@ MFLevel::~MFLevel()
 
 void MFLevel::_enter_tree()
 {
-    MFManager::get()->connect( "current_view_changed", godot::Callable( this, "set_view" ) );
+    MFManager::get()->connect( "current_view_changed", godot::Callable( this, "_on_view_changed" ) );
 
     m_minViewDurationtimer = memnew( godot::Timer() );
     m_minViewDurationtimer->set_one_shot( true );
@@ -75,7 +75,7 @@ void MFLevel::_enter_tree()
         godot::Ref<godot::Environment> environment = memnew( godot::Environment );
         environment->set_sky( sky );
 
-        // mft panoramas are z+ forward while godod uses z- forward
+        // mft panoramas are z+ forward while godot uses z- forward
         environment->set_sky_rotation( godot::Vector3( 0.0, Math_PI, 0.0 ) );
         environment->set_ambient_source( godot::Environment::AMBIENT_SOURCE_SKY );
         environment->set_reflection_source( godot::Environment::REFLECTION_SOURCE_SKY );
@@ -91,8 +91,20 @@ void MFLevel::_enter_tree()
     initialize_level_data();
 }
 
+void MFLevel::_exit_tree()
+{
+    MFManager::get()->disconnect( "current_view_changed", godot::Callable( this, "_on_view_changed" ) );
+}
+
 void MFLevel::_ready()
 {
+}
+
+void MFLevel::_on_view_changed( godot::String path, int view_id )
+{
+    if( path != m_levelFilePath )
+        return;
+    set_view( view_id );
 }
 
 void MFLevel::update_shadows()
@@ -114,36 +126,26 @@ void MFLevel::update_shadows()
 
     int capsule_count = 0;
 
-    // Get all children recursively
     godot::TypedArray<godot::Node> nodes = get_tree()->get_nodes_in_group( "capsule_shadow" );
 
     for( int i = 0; i < nodes.size() && capsule_count < MAX_CAPSULES; i++ )
     {
         godot::CollisionShape3D* collision_shape = godot::Object::cast_to<godot::CollisionShape3D>( nodes[i] );
         if( !collision_shape )
-        {
             continue;
-        }
 
         godot::Ref<godot::CapsuleShape3D> capsule_shape = collision_shape->get_shape();
         if( !capsule_shape.is_valid() )
-        {
             continue;
-        }
 
-        // Get world transform
         godot::Transform3D world_transform = collision_shape->get_global_transform();
         godot::Vector3 world_pos           = world_transform.origin;
 
-        // Capsule is oriented along Y axis in local space
         float height = capsule_shape->get_height();
         float radius = capsule_shape->get_radius();
 
-        // Extract scale from transform
         godot::Vector3 scale = world_transform.basis.get_scale();
 
-        // Calculate start and end positions (excluding hemisphere caps)
-        // Scale height by Y axis and radius by average of X and Z
         float half_height        = ( height * 0.5f - radius ) * scale.y;
         float scaled_radius      = radius * ( ( scale.x + scale.z ) * 0.5f );
         godot::Vector3 local_dir = godot::Vector3( 0, 1, 0 );
@@ -156,7 +158,6 @@ void MFLevel::update_shadows()
         capsule_count++;
     }
 
-    // Update shader parameters
     m_backgroundMaterial->set_shader_parameter( "capsule_starts", capsule_starts );
     m_backgroundMaterial->set_shader_parameter( "capsule_ends", capsule_ends );
     m_backgroundMaterial->set_shader_parameter( "capsule_radii", capsule_radii );
@@ -165,21 +166,20 @@ void MFLevel::update_shadows()
 
 void MFLevel::initialize_level_data()
 {
-
     if( m_levelFilePath.is_empty() || !m_levelReady )
-    {
         return;
-    }
 
     if( !MFManager::get()->load( m_levelFilePath ) )
     {
         godot::UtilityFunctions::print( "load level failed" );
+        emit_signal( "level_load_failed", m_levelFilePath );
         return;
     }
 
     setup_navmesh();
-
     setup_cameras();
+
+    emit_signal( "level_loaded", m_levelFilePath );
 }
 
 void MFLevel::setup_cameras()
@@ -187,9 +187,7 @@ void MFLevel::setup_cameras()
     if( m_editorMode )
     {
         for( godot::Camera3D* camera : m_editorCameras )
-        {
             camera->queue_free();
-        }
         m_editorCameras.clear();
 
         for( int i = 0; i < MFManager::get()->get_num_views(); ++i )
@@ -219,22 +217,17 @@ void MFLevel::setup_navmesh()
     collisionShape->set_shape( navmesh );
 
     m_collision->add_child( collisionShape );
-
     collisionShape->set_owner( this );
 }
 
 bool MFLevel::set_view( int view_id )
 {
     if( m_editorMode )
-    {
         return false;
-    }
 
-    if( MFManager::get()->get_current_level() != m_levelFilePath )
-    {
-        m_gameCamera->set_current( false );
+    // Activate this level in the manager (no-op if already active, swaps otherwise)
+    if( !MFManager::get()->load( m_levelFilePath ) )
         return false;
-    }
 
     m_cur_camera_index = view_id;
 
@@ -260,16 +253,19 @@ bool MFLevel::set_view( int view_id )
 
     m_minViewDurationtimer->start( m_minViewDuration );
 
+    emit_signal( "view_changed", view_id );
+
     return true;
 }
 
-// this function currently assumes the camera fov is set to cropped_fpv
+// this function currently assumes the camera fov is set to cropped_fov
 bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
 {
     if( m_editorMode )
-    {
         return false;
-    }
+
+    if( !MFManager::get()->load( m_levelFilePath ) )
+        return false;
 
     const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( m_cur_camera_index );
 
@@ -277,9 +273,7 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     float max_tilt = view_data->m_view_info->max_tilt();
 
     if( max_pan == 0.0 && max_tilt == 0.0 )
-    {
         return false;
-    }
 
     godot::Transform3D camera_tranform_uncropped = view_data->m_transform;
     godot::Transform3D camera_tranform           = m_gameCamera->get_camera_transform();
@@ -288,18 +282,15 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     {
         godot::Vector3 camera_space_point = camera_tranform_uncropped.xform_inv( point );
 
-        // Extract pan (horizontal angle around Y axis) and tilt (vertical angle)
         float distance        = camera_space_point.length();
         float horizontal_dist = sqrt( camera_space_point.x * camera_space_point.x + camera_space_point.z * camera_space_point.z );
 
         float pan  = atan2( camera_space_point.x, -camera_space_point.z );
         float tilt = atan2( camera_space_point.y, horizontal_dist );
 
-        // Clamp to max bounds
         pan  = godot::Math::clamp( pan, -max_pan * 0.5f, max_pan * 0.5f );
         tilt = godot::Math::clamp( tilt, -max_tilt * 0.5f, max_tilt * 0.5f );
 
-        // Reconstruct direction from clamped pan/tilt
         godot::Vector3 clamped_direction( cos( tilt ) * sin( pan ), sin( tilt ), -cos( tilt ) * cos( pan ) );
 
         point = camera_tranform_uncropped.xform( clamped_direction * distance );
@@ -309,9 +300,7 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
 
     point = camera_forward.slerp( point, 1.0 - smooth );
 
-    godot::Transform3D camera_tranform_new = camera_tranform.looking_at( point );
-
-    m_gameCamera->set_transform( camera_tranform_new );
+    m_gameCamera->set_transform( camera_tranform.looking_at( point ) );
 
     return true;
 }
@@ -319,11 +308,12 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
 bool MFLevel::set_closest_view( const godot::Vector3& point )
 {
     if( m_minViewDurationtimer->get_time_left() != 0.0 )
-    {
         return false;
-    }
 
-    const int viewId = MFManager::get()->get_closest_view_Id( point );
+    if( !MFManager::get()->load( m_levelFilePath ) )
+        return false;
+
+    const int viewId = MFManager::get()->get_closest_view_id( point );
     return MFManager::get()->set_current_view( viewId );
 }
 
@@ -353,6 +343,15 @@ godot::String MFLevel::get_level_file_path() const
 
 void MFLevel::_bind_methods()
 {
+    ADD_SIGNAL( godot::MethodInfo( "level_loaded",
+        godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
+    ADD_SIGNAL( godot::MethodInfo( "level_load_failed",
+        godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
+    ADD_SIGNAL( godot::MethodInfo( "view_changed",
+        godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
+
+    godot::ClassDB::bind_method( godot::D_METHOD( "_on_view_changed", "path", "view_id" ), &MFLevel::_on_view_changed );
+
     godot::ClassDB::bind_method( godot::D_METHOD( "set_view", "viewId" ), &MFLevel::set_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "set_closest_view", "point" ), &MFLevel::set_closest_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "look_at", "point", "clamp_region", "smooth_rate" ), &MFLevel::look_at );
@@ -365,7 +364,11 @@ void MFLevel::_bind_methods()
     godot::ClassDB::bind_method( godot::D_METHOD( "get_level_file_path" ), &MFLevel::get_level_file_path );
 
     // Properties.
-    ADD_GROUP( "View Properties", "group_" );
-    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::FLOAT, "group_min_view_duration" ), "set_min_view_duration", "get_min_view_duration" );
-    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::STRING, "group_level_file_path" ), "set_level_file_path", "get_level_file_path" );
+    ADD_GROUP( "View Properties", "" );
+    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::FLOAT, "min_view_duration",
+                      godot::PROPERTY_HINT_RANGE, "0.0,10.0,0.01,or_greater,suffix:s" ),
+                  "set_min_view_duration", "get_min_view_duration" );
+    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::STRING, "level_file_path",
+                      godot::PROPERTY_HINT_FILE, "*.mflevel" ),
+                  "set_level_file_path", "get_level_file_path" );
 }

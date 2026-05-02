@@ -24,6 +24,7 @@ class MFLevel : public godot::Node3D
     MFLevel( const godot::String& path = "" );
     void _ready() override;
     void _enter_tree() override;
+    void _exit_tree() override;
     bool set_view( int view_id );
     bool set_closest_view( const godot::Vector3& point );
     bool look_at( godot::Vector3 point, bool clamp_region = true, float smooth = 0.0 );
@@ -40,6 +41,7 @@ class MFLevel : public godot::Node3D
     void initialize_level_data();
     void setup_cameras();
     void setup_navmesh();
+    void _on_view_changed( godot::String path, int view_id );
 
     bool m_editorMode;
     godot::String m_levelFilePath;
