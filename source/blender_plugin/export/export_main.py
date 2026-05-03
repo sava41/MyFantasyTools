@@ -10,7 +10,7 @@ from . import render
 from . import save
 from . import serialize
 
-from ..core.view import *
+from ..core.render_view import *
 from ..core.composite import *
 from ..core.navmesh import *
 
@@ -129,7 +129,7 @@ class MFT_OT_Export(Operator):
                 view.set_next_camera_active(self._render_scene, self._comp_manager)
                 bpy.ops.render.render('INVOKE_DEFAULT', write_still=False, scene=self._render_scene.name)
 
-                if view._current_render is View.RenderType.Complete:
+                if view._current_render is RenderType.Complete:
                     self._next_index = True
 
         return {'PASS_THROUGH'}

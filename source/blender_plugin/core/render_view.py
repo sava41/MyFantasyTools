@@ -6,6 +6,17 @@ from enum import Enum
 from .composite import *
 
 
+class RenderType(Enum):
+    Main = 1
+    Probe = 2
+    Complete = 3
+
+    def next(self):
+        members = list(self.__class__)
+        index = members.index(self)
+        return members[index + 1] if index + 1 < len(members) else None
+
+
 def compute_uncropped_fov(fov, aspect, max_pan, max_tilt):
     """Compute the expanded FOV needed to accommodate max pan/tilt rotation.
 
@@ -49,18 +60,72 @@ def compute_uncropped_fov(fov, aspect, max_pan, max_tilt):
     return max_angle_h * 2.0, max_angle_v * 2.0, vfov
 
 
-#TODO: should to merge this and the MFT_Camera class at some point
-class View:
-    class RenderType(Enum):
-        Main = 1
-        Probe = 2
-        Complete = 3
+def place_env_probe(env_camera_obj, main_camera, navmesh_data):
+    """Place env_camera_obj at the midpoint between the camera and navmesh bounds.
 
-        def next(self):
-          members = list(self.__class__)
-          index = members.index(self)
-          return members[index + 1] if index + 1 < len(members) else None
+    Raycasts from main_camera toward the navmesh perimeter and floor tris to
+    find the closest and farthest intersection points, then positions the env
+    probe camera at their midpoint.
+    """
+    tris, convex_hull, = navmesh_data
 
+    trace_dir = main_camera.matrix_world.to_quaternion() @ mathutils.Vector((0.0, 0.0, -10000.0))
+    trace_start = main_camera.location
+    trace_end = trace_start + trace_dir
+
+    point_close = trace_end
+    point_far = trace_start
+
+    # Ray trace vertical walls of the prism
+    for i in range(len(convex_hull)):
+        point_a = mathutils.Vector((convex_hull[i][0], convex_hull[i][1], 0))
+        point_b = mathutils.Vector(
+            (convex_hull[i - 1][0], convex_hull[i - 1][1], 0)
+        )
+        plane_normal = mathutils.Vector((0.0, 0.0, 1.0)).cross(point_a - point_b)
+
+        intersection = mathutils.geometry.intersect_line_plane(
+            trace_start, trace_end, point_a, plane_normal
+        )
+
+        if intersection:
+            ab_length = point_a - point_b
+            ab_length.z = 0
+            ab_length = ab_length.length
+            ia_length = intersection - point_a
+            ia_length.z = 0
+            ia_length = ia_length.length
+            ib_length = intersection - point_b
+            ib_length.z = 0
+            ib_length = ib_length.length
+
+            if ia_length <= ab_length and ib_length <= ab_length:
+                if (point_close - trace_start).length > (
+                    intersection - trace_start
+                ).length:
+                    point_close = intersection
+                if (point_far - trace_start).length < (
+                    intersection - trace_start
+                ).length:
+                    point_far = intersection
+
+    # Ray trace navmesh tris
+    for tri in tris:
+        intersection = mathutils.geometry.intersect_ray_tri(tri.verts[0], tri.verts[1], tri.verts[2], trace_dir, trace_start)
+
+        if intersection:
+            point_far = intersection
+
+    if point_close is trace_end:
+        point_close = trace_start
+
+    if point_far is trace_start:
+        point_far = trace_start
+
+    env_camera_obj.location = (point_close + point_far) * 0.5
+
+
+class RenderView:
     _main_camera = None
     _name = ""
     _env_camera = None
@@ -98,7 +163,7 @@ class View:
         self._main_camera = camera.copy()
         self._main_camera.data = camera.data.copy()
         self._aspect = float(self._res_y) / float(self._res_x)
-        
+
         #horizontal fov
         self._fov = camera.data.angle
         self._render_output_path = output_path + "//renders//" + camera.name
@@ -115,14 +180,12 @@ class View:
 
         self._env_camera = bpy.data.cameras.new(camera.name + "_env")
         self._env_camera_obj = bpy.data.objects.new(camera.name + "_env", self._env_camera)
-    
+
         bpy.context.scene.collection.objects.link(self._env_camera_obj)
         self._env_camera_obj.rotation_euler[0] = math.radians(90)
         self._env_camera_obj.data.type = "PANO"
         self._env_camera_obj.data.panorama_type = "EQUIRECTANGULAR"
 
-
-    
     def __del__(self):
         #TODO: figure out if we need to remove this from the collection?
         #for collection in self._env_camera_obj.users_collection:
@@ -130,82 +193,22 @@ class View:
         bpy.data.cameras.remove(self._env_camera)
 
     def set_next_camera_active(self, scene, composite_manager):
-        if self._current_render is self.RenderType.Main:
+        if self._current_render is RenderType.Main:
             scene.camera = self._main_camera
             scene.render.resolution_x = int(self._uncropped_res_x)
             scene.render.resolution_y = int(self._uncropped_res_y)
             composite_manager.set_main_output(self._render_output_path)
-        
-        elif self._current_render is self.RenderType.Probe:
+
+        elif self._current_render is RenderType.Probe:
             scene.camera = self._env_camera_obj
             scene.render.resolution_x = 1024
             scene.render.resolution_y = 512
             composite_manager.set_env_output(self._render_output_path)
 
-        self._current_render = self.RenderType(self._current_render.value + 1)
+        self._current_render = RenderType(self._current_render.value + 1)
 
-    # Algorithm for placing env probe
-    # takes in the perimeter of the view nav mesh
-    # raycasts from the main camera out to the furthest bounds of the perimeter
-    # places env probe in the center of the raycast
     def set_env_probe_location(self, navmesh_data):
-
-        tris, convex_hull, = navmesh_data
-
-        trace_dir = self._main_camera.matrix_world.to_quaternion() @ mathutils.Vector((0.0, 0.0, -10000.0))
-        trace_start = self._main_camera.location
-        trace_end = trace_start +  trace_dir
-        
-        point_close = trace_end
-        point_far = trace_start
-
-        # Ray trace vertical walls of the prism
-        for i in range(len(convex_hull)):
-            point_a = mathutils.Vector((convex_hull[i][0], convex_hull[i][1], 0))
-            point_b = mathutils.Vector(
-                (convex_hull[i - 1][0], convex_hull[i - 1][1], 0)
-            )
-            plane_normal = mathutils.Vector((0.0, 0.0, 1.0)).cross(point_a - point_b)
-
-            intersection = mathutils.geometry.intersect_line_plane(
-                trace_start, trace_end, point_a, plane_normal
-            )
-
-            if intersection:
-                ab_length = point_a - point_b
-                ab_length.z = 0
-                ab_length = ab_length.length
-                ia_length = intersection - point_a
-                ia_length.z = 0
-                ia_length = ia_length.length
-                ib_length = intersection - point_b
-                ib_length.z = 0
-                ib_length = ib_length.length
-
-                if ia_length <= ab_length and ib_length <= ab_length:
-                    if (point_close - trace_start).length > (
-                        intersection - trace_start
-                    ).length:
-                        point_close = intersection
-                    if (point_far - trace_start).length < (
-                        intersection - trace_start
-                    ).length:
-                        point_far = intersection
-
-        # Ray trace navmesh tris
-        for tri in tris:
-            intersection = mathutils.geometry.intersect_ray_tri(tri.verts[0], tri.verts[1], tri.verts[2], trace_dir, trace_start)
-
-            if intersection:
-                point_far = intersection
-        
-        if point_close is trace_end:
-            point_close = trace_start
-
-        if point_far is trace_start:
-            point_far = trace_start
-
-        self._env_camera_obj.location = (point_close + point_far) * 0.5
+        place_env_probe(self._env_camera_obj, self._main_camera, navmesh_data)
 
     def __lt__(self, other):
         return self._camera_index < other._camera_index
@@ -214,7 +217,7 @@ class View:
 def create_view_list(cameras, output_path, scene) -> list:
     views = list()
     for index, object in enumerate(cameras):
-        views.append(View(object, index, output_path, scene))
+        views.append(RenderView(object, index, output_path, scene))
 
     if len(views) == 0:
         print("Error: No cameras found")

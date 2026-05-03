@@ -14,7 +14,7 @@ from bpy.props import (
 import bmesh
 
 from . color import generate_distinct_color, CAMERA_COLOR_ATTR, UNASSIGNED_COLOR, colors_match, face_color
-from . view import compute_uncropped_fov
+from . render_view import compute_uncropped_fov
 
 
 # ---------------------------------------------------------------------------

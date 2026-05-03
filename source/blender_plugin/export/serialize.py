@@ -9,7 +9,7 @@ from . data import Level
 from  .data import Triangle
 from  .data import ImageEntry
 
-from ..core import view
+from ..core import render_view
 from ..core import navmesh as navmesh_module
 from ..core.color import CAMERA_COLOR_ATTR, color_to_comparable
 
