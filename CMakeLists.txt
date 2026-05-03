@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(MyFantasyTools)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_BLENDER_PLUGIN "Build Blender plugin" ON)
 option(BUILD_GODOT_PLUGIN "Build Godot plugin" ON)
