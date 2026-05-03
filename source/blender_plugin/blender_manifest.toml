@@ -10,12 +10,10 @@ blender_version_min = "5.0.0"
 license = ["SPDX:MIT",]
 website = "https://github.com/sava41/MyFantasyTools"
 
-platforms = ["windows-x64", "macos-arm64"]
+platforms = ["windows-x64", "macos-arm64", "linux-x64"]
 
 wheels = [
    "./wheels/flatbuffers-23.5.26-py2.py3-none-any.whl",
-   "./wheels/fnumpy-1.26.1-cp311-cp311-macosx_11_0_arm64.whl",
-   "./wheels/fnumpy-1.26.1-cp311-cp311-win_amd64.whl",
 ]
 
 [permissions]

@@ -28,9 +28,29 @@ if (APPLE)
     set(LIB_ARCH "universal")
 endif()
 
+if(WIN32)
+    set(MFT_PLATFORM "windows")
+elseif(APPLE)
+    set(MFT_PLATFORM "macos")
+else()
+    set(MFT_PLATFORM "linux")
+endif()
+
 add_dependencies(mft_godot mflib godot-cpp)
 target_link_libraries(mft_godot PRIVATE mflib godot-cpp)
 
-install(TARGETS mft_godot COMPONENT mft LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/mft_godot_plugin)
+if(PACKAGED_BUILD)
+    set_target_properties(mft_godot PROPERTIES
+        PREFIX ""
+        OUTPUT_NAME "libmft_godot.${MFT_PLATFORM}.$<LOWER_CASE:$<CONFIG>>.${LIB_ARCH}"
+    )
+    install(TARGETS mft_godot COMPONENT mft
+        LIBRARY DESTINATION mft_godot_plugin/bin
+        RUNTIME DESTINATION mft_godot_plugin/bin)
+else()
+    install(TARGETS mft_godot COMPONENT mft
+        LIBRARY DESTINATION mft_godot_plugin
+        RUNTIME DESTINATION mft_godot_plugin)
+endif()
 
 

@@ -8,7 +8,7 @@ This project is a pipeline for making pre-rendered background, fixed-perspective
 
 ![Example Video](docs/demo.webp)
 
-## Requiremends
+## Requirements
 - Blender 5.0
 - Python 3.11
 - CMake 3.19 or later

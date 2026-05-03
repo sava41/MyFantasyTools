@@ -1,0 +1,239 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # Godot plugin — Linux
+  # ─────────────────────────────────────────────────────────────────
+  godot-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        run: sudo apt-get install -y ninja-build
+
+      - name: Build Debug
+        run: |
+          cmake -B build_debug -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPACKAGED_BUILD=ON \
+            -DBUILD_BLENDER_PLUGIN=OFF
+          cmake --build build_debug --target mft_godot
+          cmake --install build_debug --prefix dist --component mft
+
+      - name: Build Release
+        run: |
+          cmake -B build_release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPACKAGED_BUILD=ON \
+            -DBUILD_BLENDER_PLUGIN=OFF
+          cmake --build build_release --target mft_godot
+          cmake --install build_release --prefix dist --component mft
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-linux
+          path: dist/mft_godot_plugin
+
+  # ─────────────────────────────────────────────────────────────────
+  # Godot plugin — macOS (universal)
+  # ─────────────────────────────────────────────────────────────────
+  godot-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Build Debug
+        run: |
+          cmake -B build_debug -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPACKAGED_BUILD=ON \
+            -DBUILD_BLENDER_PLUGIN=OFF \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          cmake --build build_debug --target mft_godot
+          cmake --install build_debug --prefix dist --component mft
+
+      - name: Build Release
+        run: |
+          cmake -B build_release -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPACKAGED_BUILD=ON \
+            -DBUILD_BLENDER_PLUGIN=OFF \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          cmake --build build_release --target mft_godot
+          cmake --install build_release --prefix dist --component mft
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-macos
+          path: dist/mft_godot_plugin
+
+  # ─────────────────────────────────────────────────────────────────
+  # Godot plugin — Windows
+  # ─────────────────────────────────────────────────────────────────
+  godot-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Debug
+        run: |
+          cmake -B build_debug -G "Visual Studio 17 2022" `
+            -DPACKAGED_BUILD=ON `
+            -DBUILD_BLENDER_PLUGIN=OFF
+          cmake --build build_debug --target mft_godot --config Debug
+          cmake --install build_debug --prefix dist --component mft --config Debug
+
+      - name: Build Release
+        run: |
+          cmake -B build_release -G "Visual Studio 17 2022" `
+            -DPACKAGED_BUILD=ON `
+            -DBUILD_BLENDER_PLUGIN=OFF
+          cmake --build build_release --target mft_godot --config Release
+          cmake --install build_release --prefix dist --component mft --config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: godot-windows
+          path: dist/mft_godot_plugin
+
+  # ─────────────────────────────────────────────────────────────────
+  # Blender addon — Linux
+  # ─────────────────────────────────────────────────────────────────
+  blender-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ninja
+        run: sudo apt-get install -y ninja-build
+
+      - name: Build
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GODOT_PLUGIN=OFF
+          cmake --build build --target mftools
+          cmake --install build --prefix dist --component mft
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blender-linux
+          path: dist/mft_blender_addon
+
+  # ─────────────────────────────────────────────────────────────────
+  # Blender addon — macOS
+  # ─────────────────────────────────────────────────────────────────
+  blender-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Ninja
+        run: brew install ninja
+
+      - name: Build
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GODOT_PLUGIN=OFF
+          cmake --build build --target mftools
+          cmake --install build --prefix dist --component mft
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blender-macos
+          path: dist/mft_blender_addon
+
+  # ─────────────────────────────────────────────────────────────────
+  # Blender addon — Windows
+  # ─────────────────────────────────────────────────────────────────
+  blender-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" `
+            -DBUILD_GODOT_PLUGIN=OFF
+          cmake --build build --target mftools --config Release
+          cmake --install build --prefix dist --component mft --config Release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blender-windows
+          path: dist/mft_blender_addon
+
+  # ─────────────────────────────────────────────────────────────────
+  # Package Godot plugin (merge all platform artifacts)
+  # ─────────────────────────────────────────────────────────────────
+  package-godot:
+    needs: [godot-linux, godot-macos, godot-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: godot-*
+          merge-multiple: true
+          path: dist/mft_godot_plugin
+
+      - run: zip -r mft_godot_plugin.zip dist/mft_godot_plugin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mft_godot_plugin
+          path: mft_godot_plugin.zip
+
+  # ─────────────────────────────────────────────────────────────────
+  # Package Blender addon (merge all platform artifacts)
+  # ─────────────────────────────────────────────────────────────────
+  package-blender:
+    needs: [blender-linux, blender-macos, blender-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blender-*
+          merge-multiple: true
+          path: dist/mft_blender_addon
+
+      - run: zip -r mft_blender_addon.zip dist/mft_blender_addon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mft_blender_addon
+          path: mft_blender_addon.zip

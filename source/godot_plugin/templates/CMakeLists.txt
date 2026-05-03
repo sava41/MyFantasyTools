@@ -22,7 +22,7 @@ configure_file( ${GD_EXTENSION_FILE_INPUT} ${PROJECT_BINARY_DIR}/mft_godot/${GD_
 install(
     FILES ${PROJECT_BINARY_DIR}/mft_godot/${GD_EXTENSION_FILE}
     COMPONENT mft
-    DESTINATION ${PROJECT_SOURCE_DIR}/mft_godot_plugin
+    DESTINATION mft_godot_plugin
 )
 
 unset( BUILD_TYPE )

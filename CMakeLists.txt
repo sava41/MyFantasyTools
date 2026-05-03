@@ -3,7 +3,12 @@ project(MyFantasyTools)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Python 3.11 EXACT COMPONENTS Interpreter Development REQUIRED)
+option(BUILD_BLENDER_PLUGIN "Build Blender plugin" ON)
+option(BUILD_GODOT_PLUGIN "Build Godot plugin" ON)
+
+if(BUILD_BLENDER_PLUGIN)
+    find_package(Python 3.11 EXACT COMPONENTS Interpreter Development REQUIRED)
+endif()
 
 set(FETCHCONTENT_BASE_DIR ${CMAKE_BINARY_DIR}/external)
 
@@ -14,8 +19,6 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${GENERATED_DIR})
 
-set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
-
 if(APPLE)
     set(CMAKE_THREAD_LIBS_INIT "-lpthread")
     set(CMAKE_HAVE_THREADS_LIBRARY 1)
@@ -25,5 +28,11 @@ if(APPLE)
 endif()
 
 add_subdirectory(source/core)
-add_subdirectory(source/blender_plugin)
-add_subdirectory(source/godot_plugin)
+
+if(BUILD_BLENDER_PLUGIN)
+    add_subdirectory(source/blender_plugin)
+endif()
+
+if(BUILD_GODOT_PLUGIN)
+    add_subdirectory(source/godot_plugin)
+endif()
