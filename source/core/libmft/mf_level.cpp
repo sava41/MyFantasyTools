@@ -16,11 +16,11 @@ namespace mft
                 return false;
 
             m_mflevel_path   = level_file_path;
-            m_data_file_path = {};
+            m_data_file_path.clear();
         }
         else
         {
-            m_mflevel_path = {};
+            m_mflevel_path.clear();
             m_data_buffer = read_binary( level_file_path );
 
             if( m_data_buffer.empty() )

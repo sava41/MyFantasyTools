@@ -24,7 +24,7 @@ namespace mft
     void ViewResources::init( const mft::data::View* view_info, const std::filesystem::path& data_dir )
     {
         m_view_info         = view_info;
-        m_mflevel_path      = {};
+        m_mflevel_path.clear();
         m_blob_start_offset = 0;
 
         // TODO: for now views have hardcoded channels
