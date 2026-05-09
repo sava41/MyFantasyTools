@@ -18,7 +18,10 @@ namespace mft
 
     ViewResources::~ViewResources()
     {
-        unload_image_data();
+        // Cannot call destroy_image_buffers() here — it is pure virtual.
+        // Derived classes must call unload_image_data() in their own destructor.
+        m_image_buffers.clear();
+        m_images_loaded = 0;
     }
 
     void ViewResources::init( const mft::data::View* view_info, const std::filesystem::path& data_dir )
@@ -27,8 +30,11 @@ namespace mft
         m_mflevel_path.clear();
         m_blob_start_offset = 0;
 
-        // TODO: for now views have hardcoded channels
-        m_image_type_flags = ColorDirect | ColorIndirect | Depth | Environment | LightDirection;
+        m_image_type_flags = ( view_info->color_direct()    ? ColorDirect    : 0 ) |
+                             ( view_info->color_indirect()  ? ColorIndirect  : 0 ) |
+                             ( view_info->depth()           ? Depth          : 0 ) |
+                             ( view_info->environment()     ? Environment    : 0 ) |
+                             ( view_info->light_direction() ? LightDirection : 0 );
 
         std::string name = view_info->name()->c_str();
 
@@ -50,8 +56,11 @@ namespace mft
         m_mflevel_path      = mflevel_path;
         m_blob_start_offset = blob_start_offset;
 
-        // TODO: for now views have hardcoded channels
-        m_image_type_flags = ColorDirect | ColorIndirect | Depth | Environment | LightDirection;
+        m_image_type_flags = ( view_info->color_direct()    ? ColorDirect    : 0 ) |
+                             ( view_info->color_indirect()  ? ColorIndirect  : 0 ) |
+                             ( view_info->depth()           ? Depth          : 0 ) |
+                             ( view_info->environment()     ? Environment    : 0 ) |
+                             ( view_info->light_direction() ? LightDirection : 0 );
 
         m_is_init = true;
     }

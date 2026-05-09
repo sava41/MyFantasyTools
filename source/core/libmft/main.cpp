@@ -6,6 +6,11 @@
 class ViewResourcesSimple : public mft::ViewResources
 {
   public:
+    ~ViewResourcesSimple()
+    {
+        unload_image_data();
+    }
+
     bool load_camera_data() override
     {
         // Do nothing
@@ -20,7 +25,8 @@ class ViewResourcesSimple : public mft::ViewResources
             m_color.resize( buffer_size );
             return m_color.data();
         case mft::ViewResources::ColorIndirect:
-            return nullptr;
+            m_color_indirect.resize( buffer_size );
+            return m_color_indirect.data();
         case mft::ViewResources::Depth:
             m_depth.resize( buffer_size );
             return m_depth.data();
@@ -32,13 +38,13 @@ class ViewResourcesSimple : public mft::ViewResources
             return m_light_dir.data();
         }
 
-
         return nullptr;
     }
 
     void destroy_image_buffers() override
     {
         m_color.clear();
+        m_color_indirect.clear();
         m_depth.clear();
         m_env.clear();
         m_light_dir.clear();
@@ -46,6 +52,7 @@ class ViewResourcesSimple : public mft::ViewResources
 
   private:
     std::vector<char> m_color;
+    std::vector<char> m_color_indirect;
     std::vector<char> m_depth;
     std::vector<char> m_env;
     std::vector<char> m_light_dir;
