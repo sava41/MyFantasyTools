@@ -20,7 +20,7 @@ Build project:
 ```bash
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=<type>
 cmake --build build --target mflib mftools mft_godot
-cmake --install build --component mft
+cmake --install build --component mft --prefix ./
 ```
 
 Note: If the build setup has issues finding python, try manually setting `Python_ROOT_DIR` and `Python3_ROOT_DIR`
