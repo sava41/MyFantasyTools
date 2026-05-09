@@ -173,6 +173,6 @@ def serialize_level(navmesh, views, image_entries=None) -> bytearray:
     Level.AddUuid(builder, level_uuid)
     level = Level.End(builder)
 
-    builder.FinishWithFileIdentifier(level, b'MFLV')
+    builder.Finish(level, file_identifier=b'MFLV')
 
     return builder.Output()
