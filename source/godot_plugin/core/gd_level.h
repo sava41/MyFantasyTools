@@ -25,6 +25,7 @@ class MFLevel : public godot::Node3D
     void _ready() override;
     void _enter_tree() override;
     void _exit_tree() override;
+    void _process( double delta ) override;
     bool set_view( int view_id );
     bool set_closest_view( const godot::Vector3& point );
     bool look_at( godot::Vector3 point, bool clamp_region = true, float smooth = 0.0 );
@@ -41,25 +42,27 @@ class MFLevel : public godot::Node3D
     void initialize_level_data();
     void setup_cameras();
     void setup_navmesh();
+    void apply_view( int view_id );
     void _on_view_changed( godot::String path, int view_id );
 
-    bool m_editorMode;
-    godot::String m_levelFilePath;
+    bool m_editor_mode;
+    godot::String m_level_file_path;
 
-    godot::Vector<godot::Camera3D*> m_editorCameras;
-    godot::Camera3D* m_gameCamera             = nullptr;
-    godot::MeshInstance3D* m_background       = nullptr;
-    godot::StaticBody3D* m_collision          = nullptr;
-    godot::CollisionShape3D* m_collisionShape = nullptr;
+    godot::Vector<godot::Camera3D*> m_editor_cameras;
+    godot::Camera3D* m_game_camera             = nullptr;
+    godot::MeshInstance3D* m_background        = nullptr;
+    godot::StaticBody3D* m_collision           = nullptr;
+    godot::CollisionShape3D* m_collision_shape = nullptr;
 
-    godot::Ref<godot::ShaderMaterial> m_backgroundMaterial;
-    godot::Ref<godot::PanoramaSkyMaterial> m_skyMaterial;
+    godot::Ref<godot::ShaderMaterial> m_background_material;
+    godot::Ref<godot::PanoramaSkyMaterial> m_sky_material;
 
-    godot::Timer* m_minViewDurationtimer = nullptr;
+    godot::Timer* m_min_view_duration_timer = nullptr;
 
-    float m_minViewDuration;
+    float m_min_view_duration;
 
-    int m_cur_camera_index;
+    int m_cur_camera_index = -1;
+    int m_pending_view_id  = -1;
 
-    std::atomic<bool> m_levelReady = false;
+    std::atomic<bool> m_level_ready = false;
 };

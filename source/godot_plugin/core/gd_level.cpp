@@ -17,12 +17,12 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 
 MFLevel::MFLevel( const godot::String& path )
-    : m_backgroundMaterial( memnew( godot::ShaderMaterial ) )
-    , m_skyMaterial( memnew( godot::PanoramaSkyMaterial ) )
-    , m_minViewDuration( 0.5 )
-    , m_levelFilePath( path )
+    : m_background_material( memnew( godot::ShaderMaterial ) )
+    , m_sky_material( memnew( godot::PanoramaSkyMaterial ) )
+    , m_min_view_duration( 0.5 )
+    , m_level_file_path( path )
 {
-    m_editorMode = godot::Engine::get_singleton()->is_editor_hint();
+    m_editor_mode = godot::Engine::get_singleton()->is_editor_hint();
 }
 
 MFLevel::~MFLevel()
@@ -33,42 +33,42 @@ void MFLevel::_enter_tree()
 {
     MFManager::get()->connect( "current_view_changed", godot::Callable( this, "_on_view_changed" ) );
 
-    m_minViewDurationtimer = memnew( godot::Timer() );
-    m_minViewDurationtimer->set_one_shot( true );
-    add_child( m_minViewDurationtimer );
+    m_min_view_duration_timer = memnew( godot::Timer() );
+    m_min_view_duration_timer->set_one_shot( true );
+    add_child( m_min_view_duration_timer );
 
     m_collision = memnew( godot::StaticBody3D() );
     m_collision->set_owner( this );
     add_child( m_collision );
 
-    if( !m_editorMode )
+    if( !m_editor_mode )
     {
         m_background = memnew( godot::MeshInstance3D() );
         m_background->set_gi_mode( godot::GeometryInstance3D::GI_MODE_DISABLED );
         m_background->set_cast_shadows_setting( godot::GeometryInstance3D::SHADOW_CASTING_SETTING_OFF );
 
-        m_gameCamera = memnew( godot::Camera3D() );
-        m_gameCamera->set_keep_aspect_mode( godot::Camera3D::KEEP_WIDTH );
-        m_gameCamera->add_child( m_background );
-        add_child( m_gameCamera );
+        m_game_camera = memnew( godot::Camera3D() );
+        m_game_camera->set_keep_aspect_mode( godot::Camera3D::KEEP_WIDTH );
+        m_game_camera->add_child( m_background );
+        add_child( m_game_camera );
 
         godot::String shader = godot::FileAccess::get_file_as_string( "res://addons/mft_godot_plugin/background.gdshader" );
 
-        godot::Ref<godot::Shader> backgroundShader = memnew( godot::Shader );
-        backgroundShader->set_code( shader );
+        godot::Ref<godot::Shader> background_shader = memnew( godot::Shader );
+        background_shader->set_code( shader );
 
-        m_backgroundMaterial->set_render_priority( godot::Material::RENDER_PRIORITY_MAX );
-        m_backgroundMaterial->set_shader( backgroundShader );
+        m_background_material->set_render_priority( godot::Material::RENDER_PRIORITY_MAX );
+        m_background_material->set_shader( background_shader );
 
-        godot::Ref<godot::QuadMesh> backgroundMesh = memnew( godot::QuadMesh );
-        backgroundMesh->set_size( { 2.0, 2.0 } );
-        backgroundMesh->set_flip_faces( false );
-        backgroundMesh->set_material( m_backgroundMaterial );
+        godot::Ref<godot::QuadMesh> background_mesh = memnew( godot::QuadMesh );
+        background_mesh->set_size( { 2.0, 2.0 } );
+        background_mesh->set_flip_faces( false );
+        background_mesh->set_material( m_background_material );
 
-        m_background->set_mesh( backgroundMesh );
+        m_background->set_mesh( background_mesh );
 
         godot::Ref<godot::Sky> sky = memnew( godot::Sky );
-        sky->set_material( m_skyMaterial );
+        sky->set_material( m_sky_material );
         sky->set_process_mode( godot::Sky::PROCESS_MODE_REALTIME );
         sky->set_radiance_size( godot::Sky::RADIANCE_SIZE_256 );
 
@@ -81,12 +81,14 @@ void MFLevel::_enter_tree()
         environment->set_reflection_source( godot::Environment::REFLECTION_SOURCE_SKY );
         environment->set_tonemapper( godot::Environment::TONE_MAPPER_AGX );
         environment->set_tonemap_exposure( 8.0 );
-        m_gameCamera->set_environment( environment );
+        m_game_camera->set_environment( environment );
 
         godot::UtilityFunctions::print( "created game camera" );
+
+        set_process( true );
     }
 
-    m_levelReady = true;
+    m_level_ready = true;
 
     initialize_level_data();
 }
@@ -100,16 +102,27 @@ void MFLevel::_ready()
 {
 }
 
+void MFLevel::_process( double /*delta*/ )
+{
+    MFManager::get()->poll_pending();
+
+    if( m_pending_view_id != -1 && MFManager::get()->is_view_loaded( m_pending_view_id ) )
+    {
+        apply_view( m_pending_view_id );
+        m_pending_view_id = -1;
+    }
+}
+
 void MFLevel::_on_view_changed( godot::String path, int view_id )
 {
-    if( path != m_levelFilePath )
+    if( path != m_level_file_path )
         return;
     set_view( view_id );
 }
 
 void MFLevel::update_shadows()
 {
-    if( m_editorMode || !m_backgroundMaterial.is_valid() )
+    if( m_editor_mode || !m_background_material.is_valid() )
     {
         return;
     }
@@ -158,53 +171,63 @@ void MFLevel::update_shadows()
         capsule_count++;
     }
 
-    m_backgroundMaterial->set_shader_parameter( "capsule_starts", capsule_starts );
-    m_backgroundMaterial->set_shader_parameter( "capsule_ends", capsule_ends );
-    m_backgroundMaterial->set_shader_parameter( "capsule_radii", capsule_radii );
-    m_backgroundMaterial->set_shader_parameter( "capsule_count", capsule_count );
+    m_background_material->set_shader_parameter( "capsule_starts", capsule_starts );
+    m_background_material->set_shader_parameter( "capsule_ends", capsule_ends );
+    m_background_material->set_shader_parameter( "capsule_radii", capsule_radii );
+    m_background_material->set_shader_parameter( "capsule_count", capsule_count );
 }
 
 void MFLevel::initialize_level_data()
 {
-    if( m_levelFilePath.is_empty() || !m_levelReady )
+    if( m_level_file_path.is_empty() || !m_level_ready )
         return;
 
-    if( !MFManager::get()->load( m_levelFilePath ) )
+    if( !MFManager::get()->load( m_level_file_path ) )
     {
         godot::UtilityFunctions::print( "load level failed" );
-        emit_signal( "level_load_failed", m_levelFilePath );
+        emit_signal( "level_load_failed", m_level_file_path );
         return;
     }
 
     setup_navmesh();
     setup_cameras();
 
-    emit_signal( "level_loaded", m_levelFilePath );
+    emit_signal( "level_loaded", m_level_file_path );
 }
 
 void MFLevel::setup_cameras()
 {
-    if( m_editorMode )
+    if( !m_editor_mode )
+        return;
+
+    for( godot::Camera3D* camera : m_editor_cameras )
+        camera->queue_free();
+    m_editor_cameras.clear();
+
+    const auto* fbs = MFManager::get()->get_level().fbs();
+    if( !fbs || !fbs->views() )
+        return;
+
+    for( int i = 0; i < static_cast<int>( fbs->views()->size() ); ++i )
     {
-        for( godot::Camera3D* camera : m_editorCameras )
-            camera->queue_free();
-        m_editorCameras.clear();
+        const auto* view = fbs->views()->Get( i );
+        const auto* mat  = view->world_transform();
 
-        for( int i = 0; i < MFManager::get()->get_num_views(); ++i )
-        {
-            const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( i );
+        // Build y-up Transform3D from z-up flatbuffer Mat4.
+        godot::Transform3D t( mat->m00(), mat->m01(), mat->m02(), mat->m10(), mat->m11(), mat->m12(), mat->m20(), mat->m21(), mat->m22(), mat->m03(),
+                              mat->m13(), mat->m23() );
+        t.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );
 
-            godot::Camera3D* camera = memnew( godot::Camera3D() );
-            camera->set_name( godot::String( view_data->m_view_info->name()->c_str() ) );
-            camera->set_transform( view_data->m_transform );
+        godot::Camera3D* camera = memnew( godot::Camera3D() );
+        camera->set_name( godot::String( view->name()->c_str() ) );
+        camera->set_transform( t );
 
-            add_child( camera );
-            camera->set_owner( this );
+        add_child( camera );
+        camera->set_owner( this );
 
-            m_editorCameras.push_back( camera );
+        m_editor_cameras.push_back( camera );
 
-            godot::UtilityFunctions::print( "made camera ", view_data->m_view_info->name()->c_str() );
-        }
+        godot::UtilityFunctions::print( "made camera ", view->name()->c_str() );
     }
 }
 
@@ -213,77 +236,97 @@ void MFLevel::setup_navmesh()
     godot::Ref<godot::ConcavePolygonShape3D> navmesh = memnew( godot::ConcavePolygonShape3D );
     navmesh->set_faces( MFManager::get()->get_navmesh() );
 
-    godot::CollisionShape3D* collisionShape = memnew( godot::CollisionShape3D() );
-    collisionShape->set_shape( navmesh );
+    godot::CollisionShape3D* collision_shape = memnew( godot::CollisionShape3D() );
+    collision_shape->set_shape( navmesh );
 
-    m_collision->add_child( collisionShape );
-    collisionShape->set_owner( this );
+    m_collision->add_child( collision_shape );
+    collision_shape->set_owner( this );
 }
 
 bool MFLevel::set_view( int view_id )
 {
-    if( m_editorMode )
+    if( m_editor_mode )
         return false;
 
-    // Activate this level in the manager (no-op if already active, swaps otherwise)
-    if( !MFManager::get()->load( m_levelFilePath ) )
+    if( !MFManager::get()->load( m_level_file_path ) )
         return false;
 
     m_cur_camera_index = view_id;
 
-    const std::unique_ptr<GDViewResources>& view_resources = MFManager::get()->get_view_data( view_id );
-
-    m_backgroundMaterial->set_shader_parameter( "color_direct", godot::ImageTexture::create_from_image( view_resources->m_colorDirectBuffer ) );
-    m_backgroundMaterial->set_shader_parameter( "color_indirect", godot::ImageTexture::create_from_image( view_resources->m_colorIndirectBuffer ) );
-    m_backgroundMaterial->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( view_resources->m_depthBuffer ) );
-    m_backgroundMaterial->set_shader_parameter( "light_direction", godot::ImageTexture::create_from_image( view_resources->m_lightDirectionBuffer ) );
-
-    m_backgroundMaterial->set_shader_parameter( "fov", view_resources->m_view_info->cropped_fov() );
-    m_backgroundMaterial->set_shader_parameter( "uncropped_fov", view_resources->m_view_info->fov() );
-    m_backgroundMaterial->set_shader_parameter( "uncropped_aspect", view_resources->m_view_info->aspect() );
-    m_backgroundMaterial->set_shader_parameter( "uncropped_view_mat", view_resources->m_transform );
-
-    m_skyMaterial->set_panorama( godot::ImageTexture::create_from_image( view_resources->m_envBuffer ) );
-
-    m_gameCamera->set_current( true );
-    m_gameCamera->set_transform( view_resources->m_transform );
-    m_gameCamera->set_fov( godot::Math::rad_to_deg( view_resources->m_view_info->cropped_fov() ) );
-
-    godot::UtilityFunctions::print( "set camera: ", godot::String( view_resources->m_view_info->name()->c_str() ) );
-
-    m_minViewDurationtimer->start( m_minViewDuration );
-
-    emit_signal( "view_changed", view_id );
+    if( MFManager::get()->is_view_loaded( view_id ) )
+    {
+        apply_view( view_id );
+        m_pending_view_id = -1;
+    }
+    else
+    {
+        m_pending_view_id = view_id;
+    }
 
     return true;
+}
+
+void MFLevel::apply_view( int view_id )
+{
+    const MFManager::ViewCache* cache = MFManager::get()->get_view_cache( view_id );
+    if( !cache )
+        return;
+
+    const auto* view = MFManager::get()->get_level().fbs()->views()->Get( view_id );
+
+    m_background_material->set_shader_parameter( "color_direct", godot::ImageTexture::create_from_image( cache->color_direct ) );
+    m_background_material->set_shader_parameter( "color_indirect", godot::ImageTexture::create_from_image( cache->color_indirect ) );
+    m_background_material->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( cache->depth ) );
+    m_background_material->set_shader_parameter( "light_direction", godot::ImageTexture::create_from_image( cache->light_dir ) );
+
+    m_background_material->set_shader_parameter( "fov", view->cropped_fov() );
+    m_background_material->set_shader_parameter( "uncropped_fov", view->fov() );
+    m_background_material->set_shader_parameter( "uncropped_aspect", view->aspect() );
+    m_background_material->set_shader_parameter( "uncropped_view_mat", cache->transform );
+
+    m_sky_material->set_panorama( godot::ImageTexture::create_from_image( cache->env ) );
+
+    m_game_camera->set_current( true );
+    m_game_camera->set_transform( cache->transform );
+    m_game_camera->set_fov( godot::Math::rad_to_deg( view->cropped_fov() ) );
+
+    godot::UtilityFunctions::print( "set camera: ", godot::String( view->name()->c_str() ) );
+
+    m_min_view_duration_timer->start( m_min_view_duration );
+
+    emit_signal( "view_changed", view_id );
 }
 
 // this function currently assumes the camera fov is set to cropped_fov
 bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
 {
-    if( m_editorMode )
+    if( m_editor_mode )
         return false;
 
-    if( !MFManager::get()->load( m_levelFilePath ) )
+    if( !MFManager::get()->load( m_level_file_path ) )
         return false;
 
-    const std::unique_ptr<GDViewResources>& view_data = MFManager::get()->get_view_data( m_cur_camera_index );
+    const MFManager::ViewCache* cache = MFManager::get()->get_view_cache( m_cur_camera_index );
+    if( !cache )
+        return false;
 
-    float max_pan  = view_data->m_view_info->max_pan();
-    float max_tilt = view_data->m_view_info->max_tilt();
+    const auto* view = MFManager::get()->get_level().fbs()->views()->Get( m_cur_camera_index );
+
+    const float max_pan  = view->max_pan();
+    const float max_tilt = view->max_tilt();
 
     if( max_pan == 0.0 && max_tilt == 0.0 )
         return false;
 
-    godot::Transform3D camera_tranform_uncropped = view_data->m_transform;
-    godot::Transform3D camera_tranform           = m_gameCamera->get_camera_transform();
+    const godot::Transform3D camera_transform_uncropped = cache->transform;
+    const godot::Transform3D camera_transform           = m_game_camera->get_camera_transform();
 
     if( clamp_region )
     {
-        godot::Vector3 camera_space_point = camera_tranform_uncropped.xform_inv( point );
+        const godot::Vector3 camera_space_point = camera_transform_uncropped.xform_inv( point );
 
-        float distance        = camera_space_point.length();
-        float horizontal_dist = sqrt( camera_space_point.x * camera_space_point.x + camera_space_point.z * camera_space_point.z );
+        const float distance        = camera_space_point.length();
+        const float horizontal_dist = sqrt( camera_space_point.x * camera_space_point.x + camera_space_point.z * camera_space_point.z );
 
         float pan  = atan2( camera_space_point.x, -camera_space_point.z );
         float tilt = atan2( camera_space_point.y, horizontal_dist );
@@ -291,64 +334,61 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
         pan  = godot::Math::clamp( pan, -max_pan * 0.5f, max_pan * 0.5f );
         tilt = godot::Math::clamp( tilt, -max_tilt * 0.5f, max_tilt * 0.5f );
 
-        godot::Vector3 clamped_direction( cos( tilt ) * sin( pan ), sin( tilt ), -cos( tilt ) * cos( pan ) );
+        const godot::Vector3 clamped_direction( cos( tilt ) * sin( pan ), sin( tilt ), -cos( tilt ) * cos( pan ) );
 
-        point = camera_tranform_uncropped.xform( clamped_direction * distance );
+        point = camera_transform_uncropped.xform( clamped_direction * distance );
     }
 
-    godot::Vector3 camera_forward = -camera_tranform.basis.rows[2];
+    const godot::Vector3 camera_forward = -camera_transform.basis.rows[2];
 
     point = camera_forward.slerp( point, 1.0 - smooth );
 
-    m_gameCamera->set_transform( camera_tranform.looking_at( point ) );
+    m_game_camera->set_transform( camera_transform.looking_at( point ) );
 
     return true;
 }
 
 bool MFLevel::set_closest_view( const godot::Vector3& point )
 {
-    if( m_minViewDurationtimer->get_time_left() != 0.0 )
+    if( m_min_view_duration_timer->get_time_left() != 0.0 )
         return false;
 
-    if( !MFManager::get()->load( m_levelFilePath ) )
+    if( !MFManager::get()->load( m_level_file_path ) )
         return false;
 
-    const int viewId = MFManager::get()->get_closest_view_id( point );
-    return MFManager::get()->set_current_view( viewId );
+    const int view_id = MFManager::get()->get_closest_view_id( point );
+    return MFManager::get()->set_current_view( view_id );
 }
 
 void MFLevel::set_min_view_duration( float timeMS )
 {
-    m_minViewDuration = timeMS;
+    m_min_view_duration = timeMS;
 }
 
 float MFLevel::get_min_view_duration() const
 {
-    return m_minViewDuration;
+    return m_min_view_duration;
 }
 
 void MFLevel::set_level_file_path( const godot::String& path )
 {
-    if( path != m_levelFilePath )
+    if( path != m_level_file_path )
     {
-        m_levelFilePath = path;
+        m_level_file_path = path;
         initialize_level_data();
     }
 }
 
 godot::String MFLevel::get_level_file_path() const
 {
-    return m_levelFilePath;
+    return m_level_file_path;
 }
 
 void MFLevel::_bind_methods()
 {
-    ADD_SIGNAL( godot::MethodInfo( "level_loaded",
-        godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
-    ADD_SIGNAL( godot::MethodInfo( "level_load_failed",
-        godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
-    ADD_SIGNAL( godot::MethodInfo( "view_changed",
-        godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
+    ADD_SIGNAL( godot::MethodInfo( "level_loaded", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
+    ADD_SIGNAL( godot::MethodInfo( "level_load_failed", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
+    ADD_SIGNAL( godot::MethodInfo( "view_changed", godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "_on_view_changed", "path", "view_id" ), &MFLevel::_on_view_changed );
 
@@ -365,10 +405,8 @@ void MFLevel::_bind_methods()
 
     // Properties.
     ADD_GROUP( "View Properties", "" );
-    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::FLOAT, "min_view_duration",
-                      godot::PROPERTY_HINT_RANGE, "0.0,10.0,0.01,or_greater,suffix:s" ),
+    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::FLOAT, "min_view_duration", godot::PROPERTY_HINT_RANGE, "0.0,10.0,0.01,or_greater,suffix:s" ),
                   "set_min_view_duration", "get_min_view_duration" );
-    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::STRING, "level_file_path",
-                      godot::PROPERTY_HINT_FILE, "*.mflevel" ),
-                  "set_level_file_path", "get_level_file_path" );
+    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::STRING, "level_file_path", godot::PROPERTY_HINT_FILE, "*.mflevel" ), "set_level_file_path",
+                  "get_level_file_path" );
 }
