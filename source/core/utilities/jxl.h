@@ -1,16 +1,18 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <vector>
 
 namespace mft::jxl
 {
 
-    typedef std::function<void*( int, int, int, size_t )> buffer_allocator;
+    bool encode_oneshot( uint32_t xsize, uint32_t ysize, uint32_t channels, const void* pixels, std::vector<char>& compressed );
 
-    bool encode_oneshot( const uint32_t xsize, const uint32_t ysize, const uint32_t channels, const void* pixelData, std::vector<char>& compressed );
-
-    bool decode_oneshot( std::vector<char>& compressed, const buffer_allocator& allocator );
+    // Decode a JXL image into a caller-provided buffer.
+    // out_pixels must point to at least out_pixel_bytes bytes of writable memory.
+    // Size should be: width * height * channels * sizeof(float)
+    // where width/height/channels can be read from the Level flatbuffer (View::res_x/res_y).
+    bool decode_jxl( const void* compressed, size_t compressed_size, void* out_pixels, size_t out_pixel_bytes );
 
 } // namespace mft::jxl

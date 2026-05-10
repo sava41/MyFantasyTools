@@ -1,17 +1,16 @@
 #include "jxl.h"
 
-#include "io.h"
-
 #include <assert.h>
 #include <jxl/decode_cxx.h>
 #include <jxl/encode_cxx.h>
 #include <jxl/resizable_parallel_runner_cxx.h>
 #include <jxl/thread_parallel_runner_cxx.h>
+#include <vector>
 
 namespace mft::jxl
 {
 
-    bool encode_oneshot( const uint32_t xsize, const uint32_t ysize, const uint32_t channels, const void* pixelData, std::vector<char>& compressed )
+    bool encode_oneshot( uint32_t xsize, uint32_t ysize, uint32_t channels, const void* pixels, std::vector<char>& compressed )
     {
         auto enc    = JxlEncoderMake( nullptr );
         auto runner = JxlThreadParallelRunnerMake( nullptr, JxlThreadParallelRunnerDefaultNumWorkerThreads() );
@@ -50,9 +49,7 @@ namespace mft::jxl
 
         JxlEncoderFrameSettings* frameSettings = JxlEncoderFrameSettingsCreate( enc.get(), nullptr );
 
-        // JxlEncoderSetFrameLossless(frameSettings, JXL_FALSE);
-
-        if( JXL_ENC_SUCCESS != JxlEncoderAddImageFrame( frameSettings, &pixelFormat, pixelData, sizeof( float ) * xsize * ysize * channels ) )
+        if( JXL_ENC_SUCCESS != JxlEncoderAddImageFrame( frameSettings, &pixelFormat, pixels, sizeof( float ) * xsize * ysize * channels ) )
         {
             fprintf( stderr, "JxlEncoderAddImageFrame failed\n" );
             return false;
@@ -67,7 +64,6 @@ namespace mft::jxl
         while( result == JXL_ENC_NEED_MORE_OUTPUT )
         {
             result = JxlEncoderProcessOutput( enc.get(), &nextOut, &availOut );
-
             if( result == JXL_ENC_NEED_MORE_OUTPUT )
             {
                 size_t offset = nextOut - reinterpret_cast<uint8_t*>( compressed.data() );
@@ -87,12 +83,11 @@ namespace mft::jxl
         return true;
     }
 
-    bool decode_oneshot( std::vector<char>& compressed, const buffer_allocator& allocator )
+    bool decode_jxl( const void* compressed, size_t compressed_size, void* out_pixels, size_t out_pixel_bytes )
     {
-        // Multi-threaded parallel runner.
         auto runner = JxlResizableParallelRunnerMake( nullptr );
+        auto dec    = JxlDecoderMake( nullptr );
 
-        auto dec = JxlDecoderMake( nullptr );
         if( JXL_DEC_SUCCESS != JxlDecoderSubscribeEvents( dec.get(), JXL_DEC_BASIC_INFO | JXL_DEC_COLOR_ENCODING | JXL_DEC_FULL_IMAGE ) )
         {
             fprintf( stderr, "JxlDecoderSubscribeEvents failed\n" );
@@ -106,8 +101,7 @@ namespace mft::jxl
         }
 
         JxlBasicInfo info;
-
-        JxlDecoderSetInput( dec.get(), reinterpret_cast<uint8_t*>( compressed.data() ), compressed.size() );
+        JxlDecoderSetInput( dec.get(), static_cast<const uint8_t*>( compressed ), compressed_size );
         JxlDecoderCloseInput( dec.get() );
 
         for( ;; )
@@ -131,20 +125,18 @@ namespace mft::jxl
                     fprintf( stderr, "JxlDecoderGetBasicInfo failed\n" );
                     return false;
                 }
-
                 JxlResizableParallelRunnerSetThreads( runner.get(), JxlResizableParallelRunnerSuggestThreads( info.xsize, info.ysize ) );
             }
             else if( status == JXL_DEC_COLOR_ENCODING )
             {
-                // Get the ICC color profile of the pixel data
                 size_t icc_size;
                 if( JXL_DEC_SUCCESS != JxlDecoderGetICCProfileSize( dec.get(), JXL_COLOR_PROFILE_TARGET_DATA, &icc_size ) )
                 {
                     fprintf( stderr, "JxlDecoderGetICCProfileSize failed\n" );
                     return false;
                 }
-                std::vector<uint8_t> iccProfile( icc_size );
-                if( JXL_DEC_SUCCESS != JxlDecoderGetColorAsICCProfile( dec.get(), JXL_COLOR_PROFILE_TARGET_DATA, iccProfile.data(), iccProfile.size() ) )
+                std::vector<uint8_t> icc( icc_size );
+                if( JXL_DEC_SUCCESS != JxlDecoderGetColorAsICCProfile( dec.get(), JXL_COLOR_PROFILE_TARGET_DATA, icc.data(), icc.size() ) )
                 {
                     fprintf( stderr, "JxlDecoderGetColorAsICCProfile failed\n" );
                     return false;
@@ -152,22 +144,8 @@ namespace mft::jxl
             }
             else if( status == JXL_DEC_NEED_IMAGE_OUT_BUFFER )
             {
-                size_t bufferSize;
                 JxlPixelFormat format = { info.num_color_channels, JXL_TYPE_FLOAT, JXL_NATIVE_ENDIAN, 0 };
-                if( JXL_DEC_SUCCESS != JxlDecoderImageOutBufferSize( dec.get(), &format, &bufferSize ) )
-                {
-                    fprintf( stderr, "JxlDecoderImageOutBufferSize failed\n" );
-                    return false;
-                }
-
-                void* pixelsBuffer = allocator( info.xsize, info.ysize, info.num_color_channels, bufferSize );
-
-                if( pixelsBuffer == nullptr )
-                {
-                    return false;
-                }
-
-                if( JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer( dec.get(), &format, pixelsBuffer, bufferSize ) )
+                if( JXL_DEC_SUCCESS != JxlDecoderSetImageOutBuffer( dec.get(), &format, out_pixels, out_pixel_bytes ) )
                 {
                     fprintf( stderr, "JxlDecoderSetImageOutBuffer failed\n" );
                     return false;
@@ -175,14 +153,10 @@ namespace mft::jxl
             }
             else if( status == JXL_DEC_FULL_IMAGE )
             {
-                // Nothing to do. Do not yet return. If the image is an animation, more
-                // full frames may be decoded. This example only keeps the last one.
+                // continue — animation frames would appear here
             }
             else if( status == JXL_DEC_SUCCESS )
             {
-                // All decoding successfully finished.
-                // It's not required to call JxlDecoderReleaseInput(dec.get()) here since
-                // the decoder will be destroyed.
                 return true;
             }
             else
@@ -192,4 +166,5 @@ namespace mft::jxl
             }
         }
     }
+
 } // namespace mft::jxl

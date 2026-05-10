@@ -43,7 +43,7 @@ namespace mft
 
     // https://github.com/pmjoniak/GeometricTools/blob/master/GTEngine/Include/Mathematics/GteDistPointTriangleExact.h
     // https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf
-    data::Vec3 closesPointOnTriangle( const data::Vec3& vert1, const data::Vec3& vert2, const data::Vec3& vert3, const data::Vec3& point )
+    inline data::Vec3 closesPointOnTriangle( const data::Vec3& vert1, const data::Vec3& vert2, const data::Vec3& vert3, const data::Vec3& point )
     {
         data::Vec3 diff  = sub( point, vert1 );
         data::Vec3 edge0 = sub( vert2, vert1 );

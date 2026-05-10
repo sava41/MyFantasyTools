@@ -1,137 +1,143 @@
 #include "mf_level.h"
 
 #include "io.h"
-#include "mf_math.h"
+
+#include <cassert>
+#include <fstream>
+#include <limits>
+#include <queue>
 
 namespace mft
 {
 
-    bool Level::load_level( const std::string& path )
+    static const data::ImageEntry* get_image_entry( const data::View* view, ImageType type )
     {
-        const std::filesystem::path level_file_path( path );
-
-        if( level_file_path.extension() == ".mflevel" )
+        switch( type )
         {
-            if( !read_mflevel( level_file_path, m_data_buffer, m_blob_start_offset ) )
-                return false;
-
-            m_mflevel_path   = level_file_path;
-            m_data_file_path.clear();
+        case ImageType::ColorDirect:
+            return view->color_direct();
+        case ImageType::ColorIndirect:
+            return view->color_indirect();
+        case ImageType::Depth:
+            return view->depth();
+        case ImageType::Environment:
+            return view->environment();
+        case ImageType::LightDirection:
+            return view->light_direction();
         }
-        else
-        {
-            m_mflevel_path.clear();
-            m_data_buffer = read_binary( level_file_path );
+        return nullptr;
+    }
 
-            if( m_data_buffer.empty() )
-                return false;
+    bool load_level( const std::string& path, Level& out )
+    {
+        const std::filesystem::path level_path( path );
 
-            const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-            m_data_file_path  = level_file_path.parent_path() / std::filesystem::path( level->data_path()->str() );
-            printf( "Data path: %s\n", level->data_path()->c_str() );
-        }
+        if( !read_mflevel( level_path, out.flatbuffer_data, out.blob_start_offset ) )
+            return false;
 
-        m_level_info = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
+        out.mflevel_path = level_path;
         return true;
     }
 
-    bool Level::load_views( std::vector<std::unique_ptr<ViewResources>>& view_resources )
+    std::unordered_set<int> get_views_in_range( const Level& level, int start_view, int max_hops )
     {
-        if( m_level_info == nullptr )
+        const auto* views = level.fbs()->views();
+
+        std::unordered_set<int> visited;
+        std::queue<std::pair<int, int>> queue; // {view_index, depth}
+        queue.push( { start_view, 0 } );
+        visited.insert( start_view );
+
+        while( !queue.empty() )
         {
+            auto [idx, depth] = queue.front();
+            queue.pop();
+
+            if( depth >= max_hops )
+                continue;
+
+            for( auto adj : *views->Get( idx )->adjacent_views() )
+            {
+                if( !visited.count( adj ) )
+                {
+                    visited.insert( adj );
+                    queue.push( { adj, depth + 1 } );
+                }
+            }
+        }
+
+        return visited;
+    }
+
+    bool read_image_data( const Level& level, int view_index, ImageType type, void* buf, size_t buf_size )
+    {
+        const auto* view  = level.fbs()->views()->Get( view_index );
+        const auto* entry = get_image_entry( view, type );
+
+        if( !entry )
+            return false;
+
+        std::ifstream file( level.mflevel_path, std::ios::binary );
+        if( !file.good() )
+        {
+            fprintf( stderr, "Could not open %s\n", level.mflevel_path.string().c_str() );
             return false;
         }
 
-        const auto* views = m_level_info->views();
-
-        assert( views->size() == view_resources.size() );
-
-        for( int i = 0; i < view_resources.size(); ++i )
+        file.seekg( static_cast<std::streamoff>( level.blob_start_offset + entry->offset() ) );
+        if( !file.good() )
         {
-            const auto* const view_info = views->Get( i );
+            fprintf( stderr, "Seek failed for view %d\n", view_index );
+            return false;
+        }
 
-            if( !m_mflevel_path.empty() )
-                view_resources.at( i )->init( view_info, m_mflevel_path, m_blob_start_offset );
-            else
-                view_resources.at( i )->init( view_info, m_data_file_path );
-
-            // Image data is loaded on demand by ViewLevelManager::set_current_view.
-            view_resources.at( i )->load_camera_data();
-
-            printf( "initialized %s\n", view_info->name()->c_str() );
+        file.read( static_cast<char*>( buf ), static_cast<std::streamsize>( buf_size ) );
+        if( !file.good() )
+        {
+            fprintf( stderr, "Read failed for view %d\n", view_index );
+            return false;
         }
 
         return true;
     }
 
-    std::vector<int> Level::get_adjacent_views( int view_index ) const
+    int get_view_id_from_position( const Level& level, float x, float y, float z )
     {
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
-        assert( view_index >= 0 && view_index < level->views()->size() );
-
-        const auto* adjacent_views = level->views()->Get( view_index )->adjacent_views();
-
-        return std::vector<int>( adjacent_views->begin(), adjacent_views->end() );
-    }
-
-    int Level::get_view_id_from_position( float x, float y, float z ) const
-    {
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
-        const auto* verts = level->navmesh_verts();
-
+        const auto* fbs   = level.fbs();
+        const auto* verts = fbs->navmesh_verts();
         data::Vec3 point( x, y, z );
 
         float min_distance = std::numeric_limits<float>::max();
         int id             = 0;
 
-        for( auto triangle = level->navmesh_tris()->begin(); triangle != level->navmesh_tris()->end(); ++triangle )
+        for( auto tri = fbs->navmesh_tris()->begin(); tri != fbs->navmesh_tris()->end(); ++tri )
         {
-            data::Vec3 closest_point =
-                closesPointOnTriangle( *verts->Get( triangle->vert1() ), *verts->Get( triangle->vert2() ), *verts->Get( triangle->vert3() ), point );
-            float distance = length( sub( point, closest_point ) );
-
-            if( distance < min_distance )
+            data::Vec3 closest = closesPointOnTriangle( *verts->Get( tri->vert1() ), *verts->Get( tri->vert2() ), *verts->Get( tri->vert3() ), point );
+            float dist         = length( sub( point, closest ) );
+            if( dist < min_distance )
             {
-                min_distance = distance;
-                id           = triangle->view_id();
+                min_distance = dist;
+                id           = tri->view_id();
             }
         }
 
         return id;
     }
 
-    int Level::get_num_views() const
+    int get_navmesh_num_tris( const Level& level )
     {
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
-        const auto* views_data = level->views();
-
-        return views_data->size();
+        return static_cast<int>( level.fbs()->navmesh_tris()->size() );
     }
 
-    int Level::get_navmesh_num_tris()
+    std::array<float, 9> get_navmesh_tri_verts( const Level& level, int tri_index )
     {
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
-        return level->navmesh_tris()->size();
+        const auto* fbs   = level.fbs();
+        const auto* tri   = fbs->navmesh_tris()->Get( tri_index );
+        const auto* verts = fbs->navmesh_verts();
+        assert( tri_index >= 0 && tri_index < (int)fbs->navmesh_tris()->size() );
+        return { verts->Get( tri->vert1() )->x(), verts->Get( tri->vert1() )->y(), verts->Get( tri->vert1() )->z(),
+                 verts->Get( tri->vert2() )->x(), verts->Get( tri->vert2() )->y(), verts->Get( tri->vert2() )->z(),
+                 verts->Get( tri->vert3() )->x(), verts->Get( tri->vert3() )->y(), verts->Get( tri->vert3() )->z() };
     }
-
-    std::array<float, 9> Level::get_navmesh_tri_verts( int tri_index )
-    {
-        const auto* level = data::GetLevel( reinterpret_cast<const void*>( m_data_buffer.data() ) );
-
-        assert( tri_index >= 0 && tri_index < level->navmesh_tris()->size() );
-
-        auto triangle = level->navmesh_tris()->Get( tri_index );
-        auto verts    = level->navmesh_verts();
-
-        return { verts->Get( triangle->vert1() )->x(), verts->Get( triangle->vert1() )->y(), verts->Get( triangle->vert1() )->z(),
-                 verts->Get( triangle->vert2() )->x(), verts->Get( triangle->vert2() )->y(), verts->Get( triangle->vert2() )->z(),
-                 verts->Get( triangle->vert3() )->x(), verts->Get( triangle->vert3() )->y(), verts->Get( triangle->vert3() )->z() };
-    }
-
 
 } // namespace mft
