@@ -10,17 +10,6 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <thread>
 
-static godot::Transform3D view_transform( const mft::data::Mat4* mat )
-{
-    // Flatbuffer Mat4 stores column-major; rows 0-2 are basis, column 3 is translation.
-    godot::Transform3D t( mat->m00(), mat->m01(), mat->m02(), mat->m10(), mat->m11(), mat->m12(), mat->m20(), mat->m21(), mat->m22(), mat->m03(), mat->m13(),
-                          mat->m23() );
-
-    // Input transform is z-up; convert to y-up for Godot.
-    t.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );
-    return t;
-}
-
 MFManager::MFManager()
     : godot::Object()
 {
@@ -234,7 +223,6 @@ void MFManager::poll_pending()
         }
 
         const int view_id        = it->first;
-        const auto* view         = m_level.fbs()->views()->Get( view_id );
         const auto& pending_view = *it->second;
 
         ViewCache cache;
@@ -243,7 +231,6 @@ void MFManager::poll_pending()
         cache.depth          = pending_view.depth;
         cache.env            = pending_view.env;
         cache.light_dir      = pending_view.light_dir;
-        cache.transform      = view_transform( view->world_transform() );
 
         m_loaded[view_id] = std::move( cache );
         it                = m_pending.erase( it );

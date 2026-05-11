@@ -7,7 +7,6 @@
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <memory>
 #include <unordered_map>
@@ -27,7 +26,6 @@ class MFManager : public godot::Object
         godot::Ref<godot::Image> depth;
         godot::Ref<godot::Image> env;
         godot::Ref<godot::Image> light_dir;
-        godot::Transform3D transform;
     };
 
     virtual ~MFManager() override;

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mf_level.h"
+
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
 #include <godot_cpp/classes/mesh_instance3d.hpp>
@@ -10,6 +12,7 @@
 #include <godot_cpp/classes/timer.hpp>
 #include <godot_cpp/templates/vector.hpp>
 #include <godot_cpp/variant/string.hpp>
+#include <godot_cpp/variant/transform3d.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 
 class MFLevel : public godot::Node3D
@@ -40,10 +43,12 @@ class MFLevel : public godot::Node3D
 
   private:
     void initialize_level_data();
-    void setup_cameras();
+    void setup_editor_cameras();
     void setup_navmesh();
     void apply_view( int view_id );
     void _on_view_changed( godot::String path, int view_id );
+
+    static godot::Transform3D setup_camera( const mft::Level& level, int view_index, godot::Camera3D* camera );
 
     bool m_editor_mode;
     godot::String m_level_file_path;
@@ -61,8 +66,10 @@ class MFLevel : public godot::Node3D
 
     float m_min_view_duration;
 
-    int m_cur_camera_index = -1;
-    int m_pending_view_id  = -1;
+    int m_cur_view_id     = -1;
+    int m_pending_view_id = -1;
+
+    godot::Transform3D m_cur_view_transform;
 
     std::atomic<bool> m_level_ready = false;
 };

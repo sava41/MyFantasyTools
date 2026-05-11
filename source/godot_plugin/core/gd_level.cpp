@@ -190,12 +190,28 @@ void MFLevel::initialize_level_data()
     }
 
     setup_navmesh();
-    setup_cameras();
+    setup_editor_cameras();
 
     emit_signal( "level_loaded", m_level_file_path );
 }
 
-void MFLevel::setup_cameras()
+godot::Transform3D MFLevel::setup_camera( const mft::Level& level, int view_index, godot::Camera3D* camera )
+{
+    const auto* view = level.fbs()->views()->Get( view_index );
+    const auto* mat  = view->world_transform();
+
+    // Build y-up Transform3D from z-up flatbuffer Mat4.
+    godot::Transform3D transform( mat->m00(), mat->m01(), mat->m02(), mat->m10(), mat->m11(), mat->m12(), mat->m20(), mat->m21(), mat->m22(), mat->m03(),
+                                  mat->m13(), mat->m23() );
+    transform.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );
+
+    camera->set_transform( transform );
+    camera->set_fov( godot::Math::rad_to_deg( view->cropped_fov() ) );
+
+    return transform;
+}
+
+void MFLevel::setup_editor_cameras()
 {
     if( !m_editor_mode )
         return;
@@ -204,23 +220,17 @@ void MFLevel::setup_cameras()
         camera->queue_free();
     m_editor_cameras.clear();
 
-    const auto* fbs = MFManager::get()->get_level().fbs();
-    if( !fbs || !fbs->views() )
+    const mft::Level& level = MFManager::get()->get_level();
+    if( !level.fbs() || !level.fbs()->views() )
         return;
 
-    for( int i = 0; i < static_cast<int>( fbs->views()->size() ); ++i )
+    for( int i = 0; i < static_cast<int>( level.fbs()->views()->size() ); ++i )
     {
-        const auto* view = fbs->views()->Get( i );
-        const auto* mat  = view->world_transform();
-
-        // Build y-up Transform3D from z-up flatbuffer Mat4.
-        godot::Transform3D t( mat->m00(), mat->m01(), mat->m02(), mat->m10(), mat->m11(), mat->m12(), mat->m20(), mat->m21(), mat->m22(), mat->m03(),
-                              mat->m13(), mat->m23() );
-        t.rotate( godot::Vector3( 1, 0, 0 ), -Math_PI * 0.5 );
+        const auto* view = level.fbs()->views()->Get( i );
 
         godot::Camera3D* camera = memnew( godot::Camera3D() );
         camera->set_name( godot::String( view->name()->c_str() ) );
-        camera->set_transform( t );
+        setup_camera( level, i, camera );
 
         add_child( camera );
         camera->set_owner( this );
@@ -251,7 +261,7 @@ bool MFLevel::set_view( int view_id )
     if( !MFManager::get()->load( m_level_file_path ) )
         return false;
 
-    m_cur_camera_index = view_id;
+    m_cur_view_id = view_id;
 
     if( MFManager::get()->is_view_loaded( view_id ) )
     {
@@ -272,23 +282,23 @@ void MFLevel::apply_view( int view_id )
     if( !cache )
         return;
 
-    const auto* view = MFManager::get()->get_level().fbs()->views()->Get( view_id );
+    const mft::Level& level = MFManager::get()->get_level();
+    const auto* view        = level.fbs()->views()->Get( view_id );
 
     m_background_material->set_shader_parameter( "color_direct", godot::ImageTexture::create_from_image( cache->color_direct ) );
     m_background_material->set_shader_parameter( "color_indirect", godot::ImageTexture::create_from_image( cache->color_indirect ) );
     m_background_material->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( cache->depth ) );
     m_background_material->set_shader_parameter( "light_direction", godot::ImageTexture::create_from_image( cache->light_dir ) );
 
+    m_game_camera->set_current( true );
+    m_cur_view_transform = setup_camera( level, view_id, m_game_camera );
+
     m_background_material->set_shader_parameter( "fov", view->cropped_fov() );
     m_background_material->set_shader_parameter( "uncropped_fov", view->fov() );
     m_background_material->set_shader_parameter( "uncropped_aspect", view->aspect() );
-    m_background_material->set_shader_parameter( "uncropped_view_mat", cache->transform );
+    m_background_material->set_shader_parameter( "uncropped_view_mat", m_cur_view_transform );
 
     m_sky_material->set_panorama( godot::ImageTexture::create_from_image( cache->env ) );
-
-    m_game_camera->set_current( true );
-    m_game_camera->set_transform( cache->transform );
-    m_game_camera->set_fov( godot::Math::rad_to_deg( view->cropped_fov() ) );
 
     godot::UtilityFunctions::print( "set camera: ", godot::String( view->name()->c_str() ) );
 
@@ -306,11 +316,7 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     if( !MFManager::get()->load( m_level_file_path ) )
         return false;
 
-    const MFManager::ViewCache* cache = MFManager::get()->get_view_cache( m_cur_camera_index );
-    if( !cache )
-        return false;
-
-    const auto* view = MFManager::get()->get_level().fbs()->views()->Get( m_cur_camera_index );
+    const auto* view = MFManager::get()->get_level().fbs()->views()->Get( m_cur_view_id );
 
     const float max_pan  = view->max_pan();
     const float max_tilt = view->max_tilt();
@@ -318,7 +324,7 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     if( max_pan == 0.0 && max_tilt == 0.0 )
         return false;
 
-    const godot::Transform3D camera_transform_uncropped = cache->transform;
+    const godot::Transform3D camera_transform_uncropped = m_cur_view_transform;
     const godot::Transform3D camera_transform           = m_game_camera->get_camera_transform();
 
     if( clamp_region )
