@@ -9,7 +9,8 @@
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/vector3.hpp>
 #include <memory>
-#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 class MFManager : public godot::Object
 {
@@ -19,6 +20,14 @@ class MFManager : public godot::Object
     static void _bind_methods();
 
   public:
+    enum ViewStatus : uint8_t
+    {
+        unloaded = 0,
+        loading  = 1 << 0,
+        ready    = 1 << 1,
+        loaded   = 1 << 2,
+    };
+
     struct ViewCache
     {
         godot::Ref<godot::Image> color_direct;
@@ -59,27 +68,6 @@ class MFManager : public godot::Object
     const ViewCache* get_view_cache( int view_id ) const;
 
   private:
-    struct PendingView
-    {
-        // Images allocated on the main thread; worker writes into their buffers.
-        godot::Ref<godot::Image> color_direct;
-        godot::Ref<godot::Image> color_indirect;
-        godot::Ref<godot::Image> depth;
-        godot::Ref<godot::Image> env;
-        godot::Ref<godot::Image> light_dir;
-
-        // Raw pointers captured once before dispatching. Never touched on main thread
-        // until ready fires.
-        void* buf_color_direct   = nullptr;
-        void* buf_color_indirect = nullptr;
-        void* buf_depth          = nullptr;
-        void* buf_env            = nullptr;
-        void* buf_light_dir      = nullptr;
-
-        // Written by worker with release; read by main thread with acquire.
-        std::atomic<bool> ready{ false };
-    };
-
     void begin_load_view( int view_index );
 
     static inline MFManager* m_static_inst = nullptr;
@@ -87,7 +75,9 @@ class MFManager : public godot::Object
     mft::Level m_level;
     godot::String m_active_path;
     int m_current_view_id = -1;
+    std::unordered_set<int> m_in_range;
 
-    std::unordered_map<int, ViewCache> m_loaded;
-    std::unordered_map<int, std::shared_ptr<PendingView>> m_pending;
+    // Both sized to num_views on load(). Indexed by view_id.
+    std::vector<std::unique_ptr<ViewCache>> m_view_cache;
+    std::vector<std::atomic<ViewStatus>> m_view_cache_status;
 };

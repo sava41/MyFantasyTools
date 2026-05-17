@@ -28,14 +28,15 @@ bool MFManager::load( const godot::String& path )
 
     const godot::String full_path = godot::ProjectSettings::get_singleton()->globalize_path( path );
 
-    m_loaded.clear();
-    m_pending.clear();
-
     if( !mft::load_level( full_path.utf8().get_data(), m_level ) )
     {
         godot::UtilityFunctions::print( "MFManager: failed to load " + full_path );
         return false;
     }
+
+    const auto num_views = static_cast<size_t>( get_num_views() );
+    m_view_cache.assign( num_views, nullptr );
+    m_view_cache_status = std::vector<std::atomic<ViewStatus>>( num_views );
 
     m_active_path     = path;
     m_current_view_id = -1;
@@ -95,38 +96,11 @@ bool MFManager::set_current_view( int view_id )
     m_current_view_id = view_id;
 
     constexpr int k_max_hops = 2;
-    const auto in_range      = mft::get_views_in_range( m_level, view_id, k_max_hops );
+    m_in_range               = mft::get_views_in_range( m_level, view_id, k_max_hops );
 
-    // Evict loaded views that are no longer in range.
-    for( auto it = m_loaded.begin(); it != m_loaded.end(); )
+    for( int view : m_in_range )
     {
-        if( in_range.find( it->first ) == in_range.end() )
-        {
-            it = m_loaded.erase( it );
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    // Drop pending loads that are no longer in range.
-    for( auto it = m_pending.begin(); it != m_pending.end(); )
-    {
-        if( in_range.find( it->first ) == in_range.end() )
-        {
-            it = m_pending.erase( it );
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    // Begin loading views in range that are not yet loaded or pending.
-    for( int view : in_range )
-    {
-        if( m_loaded.find( view ) == m_loaded.end() && m_pending.find( view ) == m_pending.end() )
+        if( m_view_cache_status[view].load( std::memory_order_relaxed ) == unloaded )
         {
             begin_load_view( view );
         }
@@ -144,20 +118,13 @@ void MFManager::begin_load_view( int view_index )
     const int width  = static_cast<int>( view->res_x() );
     const int height = static_cast<int>( view->res_y() );
 
-    auto pending = std::make_shared<PendingView>();
-
     // Allocate Images on the main thread; the worker writes into their raw buffers.
-    pending->color_direct   = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-    pending->color_indirect = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-    pending->depth          = godot::Image::create( width, height, false, godot::Image::FORMAT_RF );
-    pending->env            = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-    pending->light_dir      = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-
-    pending->buf_color_direct   = const_cast<uint8_t*>( pending->color_direct->get_data().ptr() );
-    pending->buf_color_indirect = const_cast<uint8_t*>( pending->color_indirect->get_data().ptr() );
-    pending->buf_depth          = const_cast<uint8_t*>( pending->depth->get_data().ptr() );
-    pending->buf_env            = const_cast<uint8_t*>( pending->env->get_data().ptr() );
-    pending->buf_light_dir      = const_cast<uint8_t*>( pending->light_dir->get_data().ptr() );
+    auto cache            = std::make_unique<ViewCache>();
+    cache->color_direct   = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
+    cache->color_indirect = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
+    cache->depth          = godot::Image::create( width, height, false, godot::Image::FORMAT_RF );
+    cache->env            = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
+    cache->light_dir      = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
 
     // Pre-extract all file offsets and pixel sizes before dispatching — avoids any
     // cross-thread access to the flatbuffer or the Level struct.
@@ -174,26 +141,30 @@ void MFManager::begin_load_view( int view_index )
     };
 
     const std::vector<ImageLoad> loads = {
-        { blob + static_cast<size_t>( view->color_direct()->offset() ), static_cast<size_t>( view->color_direct()->size() ), pending->buf_color_direct, px3 },
-        { blob + static_cast<size_t>( view->color_indirect()->offset() ), static_cast<size_t>( view->color_indirect()->size() ), pending->buf_color_indirect,
-          px3 },
-        { blob + static_cast<size_t>( view->depth()->offset() ), static_cast<size_t>( view->depth()->size() ), pending->buf_depth, px1 },
-        { blob + static_cast<size_t>( view->environment()->offset() ), static_cast<size_t>( view->environment()->size() ), pending->buf_env, px3 },
-        { blob + static_cast<size_t>( view->light_direction()->offset() ), static_cast<size_t>( view->light_direction()->size() ), pending->buf_light_dir,
-          px3 },
+        { blob + static_cast<size_t>( view->color_direct()->offset() ), static_cast<size_t>( view->color_direct()->size() ),
+          const_cast<uint8_t*>( cache->color_direct->get_data().ptr() ), px3 },
+        { blob + static_cast<size_t>( view->color_indirect()->offset() ), static_cast<size_t>( view->color_indirect()->size() ),
+          const_cast<uint8_t*>( cache->color_indirect->get_data().ptr() ), px3 },
+        { blob + static_cast<size_t>( view->depth()->offset() ), static_cast<size_t>( view->depth()->size() ),
+          const_cast<uint8_t*>( cache->depth->get_data().ptr() ), px1 },
+        { blob + static_cast<size_t>( view->environment()->offset() ), static_cast<size_t>( view->environment()->size() ),
+          const_cast<uint8_t*>( cache->env->get_data().ptr() ), px3 },
+        { blob + static_cast<size_t>( view->light_direction()->offset() ), static_cast<size_t>( view->light_direction()->size() ),
+          const_cast<uint8_t*>( cache->light_dir->get_data().ptr() ), px3 },
     };
 
-    m_pending[view_index] = pending;
+    m_view_cache_status[view_index].store( loading, std::memory_order_relaxed );
+    m_view_cache[view_index] = std::move( cache );
 
-    std::string file_path = m_level.mflevel_path.string();
+    std::atomic<ViewStatus>* status = &m_view_cache_status[view_index];
 
     std::thread(
-        [pending, loads, file_path = std::move( file_path )]()
+        [status, loads, file_path = m_level.mflevel_path]()
         {
             std::ifstream file( file_path, std::ios::binary );
             if( !file )
             {
-                pending->ready.store( true, std::memory_order_release );
+                status->store( ready, std::memory_order_release );
                 return;
             }
 
@@ -204,50 +175,46 @@ void MFManager::begin_load_view( int view_index )
                 file.read( compressed.data(), static_cast<std::streamsize>( img.compressed_size ) );
                 if( !file )
                     break;
-                mft::jxl::decode_jxl( compressed.data(), img.compressed_size, img.out_buf, img.pixel_bytes );
+                if( !mft::jxl::decode_jxl( compressed.data(), img.compressed_size, img.out_buf, img.pixel_bytes ) )
+                    break;
             }
 
-            pending->ready.store( true, std::memory_order_release );
+            status->store( ready, std::memory_order_release );
         } )
         .detach();
 }
 
 void MFManager::poll_pending()
 {
-    for( auto it = m_pending.begin(); it != m_pending.end(); )
+    const int num_views = get_num_views();
+
+    for( int view_id = 0; view_id < num_views; ++view_id )
     {
-        if( !it->second->ready.load( std::memory_order_acquire ) )
+        const ViewStatus s = m_view_cache_status[view_id].load( std::memory_order_acquire );
+
+        if( m_in_range.count( view_id ) > 0 && s == ready )
         {
-            ++it;
-            continue;
+            m_view_cache_status[view_id].store( loaded, std::memory_order_relaxed );
+            emit_signal( "view_data_ready", view_id );
         }
-
-        const int view_id        = it->first;
-        const auto& pending_view = *it->second;
-
-        ViewCache cache;
-        cache.color_direct   = pending_view.color_direct;
-        cache.color_indirect = pending_view.color_indirect;
-        cache.depth          = pending_view.depth;
-        cache.env            = pending_view.env;
-        cache.light_dir      = pending_view.light_dir;
-
-        m_loaded[view_id] = std::move( cache );
-        it                = m_pending.erase( it );
-
-        emit_signal( "view_data_ready", view_id );
+        else if( s == loaded || s == ready )
+        {
+            m_view_cache[view_id].reset();
+            m_view_cache_status[view_id].store( unloaded, std::memory_order_relaxed );
+        }
     }
 }
 
 bool MFManager::is_view_loaded( int view_id ) const
 {
-    return m_loaded.find( view_id ) != m_loaded.end();
+    return m_view_cache_status[view_id].load( std::memory_order_relaxed ) == loaded;
 }
 
 const MFManager::ViewCache* MFManager::get_view_cache( int view_id ) const
 {
-    const auto found = m_loaded.find( view_id );
-    return found != m_loaded.end() ? &found->second : nullptr;
+    if( m_view_cache_status[view_id].load( std::memory_order_relaxed ) != loaded )
+        return nullptr;
+    return m_view_cache[view_id].get();
 }
 
 void MFManager::_bind_methods()
