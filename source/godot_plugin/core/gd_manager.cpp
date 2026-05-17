@@ -26,6 +26,10 @@ bool MFManager::load( const godot::String& path )
     if( m_active_path == path )
         return true;
 
+    for( const auto& status : m_view_cache_status )
+        while( status.load( std::memory_order_acquire ) == loading )
+            ;
+
     const godot::String full_path = godot::ProjectSettings::get_singleton()->globalize_path( path );
 
     if( !mft::load_level( full_path.utf8().get_data(), m_level ) )
