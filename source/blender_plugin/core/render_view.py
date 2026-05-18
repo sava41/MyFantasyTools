@@ -144,6 +144,8 @@ class RenderView:
     _max_tilt = 0
     _camera_index = 0
     _camera_color = (1.0, 1.0, 1.0)
+    _env_res_x = 1024
+    _env_res_y = 512
 
     _current_render = RenderType.Main
 
@@ -201,8 +203,8 @@ class RenderView:
 
         elif self._current_render is RenderType.Probe:
             scene.camera = self._env_camera_obj
-            scene.render.resolution_x = 1024
-            scene.render.resolution_y = 512
+            scene.render.resolution_x = self._env_res_x
+            scene.render.resolution_y = self._env_res_y
             composite_manager.set_env_output(self._render_output_path)
 
         self._current_render = RenderType(self._current_render.value + 1)

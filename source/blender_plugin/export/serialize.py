@@ -14,18 +14,21 @@ from ..core import navmesh as navmesh_module
 from ..core.color import CAMERA_COLOR_ATTR, color_to_comparable
 
 
-def _make_image_entry(builder, offset, size):
+def _make_image_entry(builder, offset, size, res_x, res_y, channels):
     """Build a FlatBuffer ImageEntry table and return its offset."""
     ImageEntry.Start(builder)
     ImageEntry.AddOffset(builder, offset)
     ImageEntry.AddSize(builder, size)
+    ImageEntry.AddResX(builder, res_x)
+    ImageEntry.AddResY(builder, res_y)
+    ImageEntry.AddChannels(builder, channels)
     return ImageEntry.End(builder)
 
 
 def serialize_level(navmesh, views, image_entries=None) -> bytearray:
     """Serialize level data to a FlatBuffer bytearray.
 
-    image_entries: optional dict  {view_name: {type_name: (offset, size)}}
+    image_entries: optional dict  {view_name: {type_name: (offset, size, res_x, res_y, channels)}}
         where type_name is one of 'ColorDirect', 'ColorIndirect', 'Depth',
         'Environment', 'LightDirection' and offset/size are byte positions
         within the .mflevel image blob.  When None the legacy data_path field
@@ -57,8 +60,8 @@ def serialize_level(navmesh, views, image_entries=None) -> bytearray:
         # nested table offsets to be created before the parent table starts).
         img_entries = {}
         if image_entries and view._name in image_entries:
-            for type_name, (offset, size) in image_entries[view._name].items():
-                img_entries[type_name] = _make_image_entry(builder, offset, size)
+            for type_name, (offset, size, res_x, res_y, channels) in image_entries[view._name].items():
+                img_entries[type_name] = _make_image_entry(builder, offset, size, res_x, res_y, channels)
 
         View.StartAdjacentViewsVector(builder, len(view._adjacent_views))
         for adj_view in view._adjacent_views:

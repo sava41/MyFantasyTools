@@ -68,16 +68,21 @@ class MFT_OT_Export(Operator):
                 # Collect JXL files in view order and build the image blob.
                 output_path_views = output_path_final / "views"
                 image_blob = bytearray()
-                image_entries = {}  # {view_name: {type_name: (offset, size)}}
+                image_entries = {}  # {view_name: {type_name: (offset, size, res_x, res_y, channels)}}
 
                 IMAGE_TYPES = ['ColorDirect', 'ColorIndirect', 'Depth', 'Environment', 'LightDirection']
+                IMAGE_CHANNELS = {'ColorDirect': 3, 'ColorIndirect': 3, 'Depth': 1, 'LightDirection': 3, 'Environment': 3}
                 for view in self._views:
                     entries = {}
+                    main_res_x = int(view._uncropped_res_x)
+                    main_res_y = int(view._uncropped_res_y)
                     for type_name in IMAGE_TYPES:
                         jxl_path = output_path_views / f"{view._name}_{type_name}.jxl"
                         if jxl_path.exists():
                             data = jxl_path.read_bytes()
-                            entries[type_name] = (len(image_blob), len(data))
+                            res_x = view._env_res_x if type_name == 'Environment' else main_res_x
+                            res_y = view._env_res_y if type_name == 'Environment' else main_res_y
+                            entries[type_name] = (len(image_blob), len(data), res_x, res_y, IMAGE_CHANNELS[type_name])
                             image_blob.extend(data)
                     image_entries[view._name] = entries
 

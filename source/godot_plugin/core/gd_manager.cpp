@@ -115,26 +115,40 @@ bool MFManager::set_current_view( int view_id )
     return true;
 }
 
+static godot::Image::Format channels_to_format( uint8_t channels )
+{
+    switch( channels )
+    {
+    case 1:
+        return godot::Image::FORMAT_RF;
+    case 3:
+        return godot::Image::FORMAT_RGBF;
+    default:
+        return godot::Image::FORMAT_RGBF;
+    }
+}
+
 void MFManager::begin_load_view( int view_index )
 {
     const auto* view = m_level.fbs()->views()->Get( view_index );
 
-    const int width  = static_cast<int>( view->res_x() );
-    const int height = static_cast<int>( view->res_y() );
+    const auto* cd  = view->color_direct();
+    const auto* ci  = view->color_indirect();
+    const auto* dep = view->depth();
+    const auto* env = view->environment();
+    const auto* ld  = view->light_direction();
 
     // Allocate Images on the main thread; the worker writes into their raw buffers.
     auto cache            = std::make_unique<ViewCache>();
-    cache->color_direct   = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-    cache->color_indirect = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-    cache->depth          = godot::Image::create( width, height, false, godot::Image::FORMAT_RF );
-    cache->env            = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
-    cache->light_dir      = godot::Image::create( width, height, false, godot::Image::FORMAT_RGBF );
+    cache->color_direct   = godot::Image::create( cd->res_x(), cd->res_y(), false, channels_to_format( cd->channels() ) );
+    cache->color_indirect = godot::Image::create( ci->res_x(), ci->res_y(), false, channels_to_format( ci->channels() ) );
+    cache->depth          = godot::Image::create( dep->res_x(), dep->res_y(), false, channels_to_format( dep->channels() ) );
+    cache->env            = godot::Image::create( env->res_x(), env->res_y(), false, channels_to_format( env->channels() ) );
+    cache->light_dir      = godot::Image::create( ld->res_x(), ld->res_y(), false, channels_to_format( ld->channels() ) );
 
     // Pre-extract all file offsets and pixel sizes before dispatching — avoids any
     // cross-thread access to the flatbuffer or the Level struct.
     const size_t blob = m_level.blob_start_offset;
-    const size_t px3  = static_cast<size_t>( width ) * height * 3 * sizeof( float );
-    const size_t px1  = static_cast<size_t>( width ) * height * sizeof( float );
 
     struct ImageLoad
     {
@@ -145,16 +159,16 @@ void MFManager::begin_load_view( int view_index )
     };
 
     const std::vector<ImageLoad> loads = {
-        { blob + static_cast<size_t>( view->color_direct()->offset() ), static_cast<size_t>( view->color_direct()->size() ),
-          const_cast<uint8_t*>( cache->color_direct->get_data().ptr() ), px3 },
-        { blob + static_cast<size_t>( view->color_indirect()->offset() ), static_cast<size_t>( view->color_indirect()->size() ),
-          const_cast<uint8_t*>( cache->color_indirect->get_data().ptr() ), px3 },
-        { blob + static_cast<size_t>( view->depth()->offset() ), static_cast<size_t>( view->depth()->size() ),
-          const_cast<uint8_t*>( cache->depth->get_data().ptr() ), px1 },
-        { blob + static_cast<size_t>( view->environment()->offset() ), static_cast<size_t>( view->environment()->size() ),
-          const_cast<uint8_t*>( cache->env->get_data().ptr() ), px3 },
-        { blob + static_cast<size_t>( view->light_direction()->offset() ), static_cast<size_t>( view->light_direction()->size() ),
-          const_cast<uint8_t*>( cache->light_dir->get_data().ptr() ), px3 },
+        { blob + static_cast<size_t>( cd->offset() ), static_cast<size_t>( cd->size() ), const_cast<uint8_t*>( cache->color_direct->get_data().ptr() ),
+          static_cast<size_t>( cd->res_x() ) * cd->res_y() * cd->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( ci->offset() ), static_cast<size_t>( ci->size() ), const_cast<uint8_t*>( cache->color_indirect->get_data().ptr() ),
+          static_cast<size_t>( ci->res_x() ) * ci->res_y() * ci->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( dep->offset() ), static_cast<size_t>( dep->size() ), const_cast<uint8_t*>( cache->depth->get_data().ptr() ),
+          static_cast<size_t>( dep->res_x() ) * dep->res_y() * dep->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( env->offset() ), static_cast<size_t>( env->size() ), const_cast<uint8_t*>( cache->env->get_data().ptr() ),
+          static_cast<size_t>( env->res_x() ) * env->res_y() * env->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( ld->offset() ), static_cast<size_t>( ld->size() ), const_cast<uint8_t*>( cache->light_dir->get_data().ptr() ),
+          static_cast<size_t>( ld->res_x() ) * ld->res_y() * ld->channels() * sizeof( float ) },
     };
 
     m_view_cache_status[view_index].store( loading, std::memory_order_relaxed );

@@ -33,10 +33,13 @@ struct Triangle {
   material_id: uint16;
 }
 
-// Byte range of a single image within the .mflevel image blob.
+// Byte range of a single image within the .mflevel image blob, plus its pixel dimensions and channel count.
 table ImageEntry {
-  offset: uint64;
-  size:   uint64;
+  offset:   uint64;
+  size:     uint64;
+  res_x:    uint16;
+  res_y:    uint16;
+  channels: uint8;
 }
 
 table View {
