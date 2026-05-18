@@ -39,7 +39,8 @@ bool MFManager::load( const godot::String& path )
     }
 
     const auto num_views = static_cast<size_t>( get_num_views() );
-    m_view_cache.assign( num_views, nullptr );
+    m_view_cache.clear();
+    m_view_cache.resize( num_views );
     m_view_cache_status = std::vector<std::atomic<ViewStatus>>( num_views );
 
     m_active_path     = path;
