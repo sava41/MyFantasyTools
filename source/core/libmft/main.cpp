@@ -1,3 +1,4 @@
+#include "io.h"
 #include "jxl.h"
 #include "mf_level.h"
 
@@ -7,6 +8,8 @@
 #include <fstream>
 #include <string>
 #include <vector>
+
+namespace data = mft::data;
 
 // --------------------------------------------------------------------------
 // Image-type table shared by all modes
