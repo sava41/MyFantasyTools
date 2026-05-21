@@ -11,7 +11,7 @@ func _enter_tree():
 
 	panel = preload("mf_panel.gd").new()
 	panel.name = "My Fantasy Tools"
-	add_control_to_dock(DOCK_LEFT_UR, panel)
+	add_control_to_dock(DOCK_SLOT_LEFT_UR, panel)
 
 
 func _exit_tree():

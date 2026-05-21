@@ -45,8 +45,8 @@ class MFLevel : public godot::Node3D
     void initialize_level_data();
     void setup_editor_cameras();
     void setup_navmesh();
-    void apply_view( int view_id );
-    void _on_view_changed( godot::String path, int view_id );
+    bool apply_view( int view_id );
+    void _on_view_data_ready( godot::String path, int view_id );
 
     static godot::Transform3D setup_camera( const mft::Level& level, int view_index, godot::Camera3D* camera );
 
@@ -66,8 +66,7 @@ class MFLevel : public godot::Node3D
 
     float m_min_view_duration;
 
-    int m_cur_view_id     = -1;
-    int m_pending_view_id = -1;
+    int m_cur_view_id = -1;
 
     godot::Transform3D m_cur_view_transform;
 

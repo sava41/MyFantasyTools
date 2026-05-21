@@ -31,7 +31,7 @@ MFLevel::~MFLevel()
 
 void MFLevel::_enter_tree()
 {
-    MFManager::get()->connect( "current_view_changed", godot::Callable( this, "_on_view_changed" ) );
+    MFManager::get()->connect( "current_view_changed", godot::Callable( this, "_on_view_data_ready" ) );
 
     m_min_view_duration_timer = memnew( godot::Timer() );
     m_min_view_duration_timer->set_one_shot( true );
@@ -95,7 +95,7 @@ void MFLevel::_enter_tree()
 
 void MFLevel::_exit_tree()
 {
-    MFManager::get()->disconnect( "current_view_changed", godot::Callable( this, "_on_view_changed" ) );
+    MFManager::get()->disconnect( "view_data_ready", godot::Callable( this, "_on_view_data_ready" ) );
 }
 
 void MFLevel::_ready()
@@ -104,20 +104,20 @@ void MFLevel::_ready()
 
 void MFLevel::_process( double /*delta*/ )
 {
-    MFManager::get()->poll_pending();
-
-    if( m_pending_view_id != -1 && MFManager::get()->is_view_loaded( m_pending_view_id ) )
-    {
-        apply_view( m_pending_view_id );
-        m_pending_view_id = -1;
-    }
 }
 
-void MFLevel::_on_view_changed( godot::String path, int view_id )
+void MFLevel::_on_view_data_ready( godot::String path, int view_id )
 {
     if( path != m_level_file_path )
+    {
         return;
-    set_view( view_id );
+    }
+    if( view_id != m_cur_view_id )
+    {
+        return;
+    }
+
+    apply_view( view_id );
 }
 
 void MFLevel::update_shadows()
@@ -256,31 +256,40 @@ void MFLevel::setup_navmesh()
 bool MFLevel::set_view( int view_id )
 {
     if( m_editor_mode )
+    {
         return false;
+    }
 
     if( !MFManager::get()->load( m_level_file_path ) )
+    {
         return false;
+    }
 
-    m_cur_view_id = view_id;
+    if( !MFManager::get()->set_current_view( view_id ) )
+    {
+        return false;
+    }
 
     if( MFManager::get()->is_view_loaded( view_id ) )
     {
         apply_view( view_id );
-        m_pending_view_id = -1;
-    }
-    else
-    {
-        m_pending_view_id = view_id;
     }
 
     return true;
 }
 
-void MFLevel::apply_view( int view_id )
+bool MFLevel::apply_view( int view_id )
 {
+    if( m_min_view_duration_timer->get_time_left() != 0.0 )
+    {
+        return false;
+    }
+
     const MFManager::ViewCache* cache = MFManager::get()->get_view_cache( view_id );
     if( !cache )
-        return;
+    {
+        return false;
+    }
 
     const mft::Level& level = MFManager::get()->get_level();
     const auto* view        = level.fbs()->views()->Get( view_id );
@@ -304,7 +313,11 @@ void MFLevel::apply_view( int view_id )
 
     m_min_view_duration_timer->start( m_min_view_duration );
 
+    m_cur_view_id = view_id;
+
     emit_signal( "view_changed", view_id );
+
+    return true;
 }
 
 // this function currently assumes the camera fov is set to cropped_fov
@@ -356,14 +369,8 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
 
 bool MFLevel::set_closest_view( const godot::Vector3& point )
 {
-    if( m_min_view_duration_timer->get_time_left() != 0.0 )
-        return false;
-
-    if( !MFManager::get()->load( m_level_file_path ) )
-        return false;
-
     const int view_id = MFManager::get()->get_closest_view_id( point );
-    return MFManager::get()->set_current_view( view_id );
+    return set_view( view_id );
 }
 
 void MFLevel::set_min_view_duration( float timeMS )
@@ -396,7 +403,7 @@ void MFLevel::_bind_methods()
     ADD_SIGNAL( godot::MethodInfo( "level_load_failed", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
     ADD_SIGNAL( godot::MethodInfo( "view_changed", godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
 
-    godot::ClassDB::bind_method( godot::D_METHOD( "_on_view_changed", "path", "view_id" ), &MFLevel::_on_view_changed );
+    godot::ClassDB::bind_method( godot::D_METHOD( "_on_view_data_ready", "path", "view_id" ), &MFLevel::_on_view_data_ready );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "set_view", "viewId" ), &MFLevel::set_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "set_closest_view", "point" ), &MFLevel::set_closest_view );

@@ -20,7 +20,7 @@ class MFManager : public godot::Object
     static void _bind_methods();
 
   public:
-    enum ViewStatus : uint8_t
+    enum class ViewStatus : uint8_t
     {
         unloaded = 0,
         loading  = 1 << 0,

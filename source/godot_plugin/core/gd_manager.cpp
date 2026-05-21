@@ -27,7 +27,7 @@ bool MFManager::load( const godot::String& path )
         return true;
 
     for( const auto& status : m_view_cache_status )
-        while( status.load( std::memory_order_acquire ) == loading )
+        while( status.load( std::memory_order_acquire ) == ViewStatus::loading )
             ;
 
     const godot::String full_path = godot::ProjectSettings::get_singleton()->globalize_path( path );
@@ -105,7 +105,7 @@ bool MFManager::set_current_view( int view_id )
 
     for( int view : m_in_range )
     {
-        if( m_view_cache_status[view].load( std::memory_order_relaxed ) == unloaded )
+        if( m_view_cache_status[view].load( std::memory_order_relaxed ) == ViewStatus::unloaded )
         {
             begin_load_view( view );
         }
@@ -172,7 +172,7 @@ void MFManager::begin_load_view( int view_index )
           static_cast<size_t>( ld->res_x() ) * ld->res_y() * ld->channels() * sizeof( float ) },
     };
 
-    m_view_cache_status[view_index].store( loading, std::memory_order_relaxed );
+    m_view_cache_status[view_index].store( ViewStatus::loading, std::memory_order_relaxed );
     m_view_cache[view_index] = std::move( cache );
 
     std::atomic<ViewStatus>* status = &m_view_cache_status[view_index];
@@ -183,7 +183,7 @@ void MFManager::begin_load_view( int view_index )
             std::ifstream file( file_path, std::ios::binary );
             if( !file )
             {
-                status->store( ready, std::memory_order_release );
+                status->store( ViewStatus::ready, std::memory_order_release );
                 return;
             }
 
@@ -198,7 +198,7 @@ void MFManager::begin_load_view( int view_index )
                     break;
             }
 
-            status->store( ready, std::memory_order_release );
+            status->store( ViewStatus::ready, std::memory_order_release );
         } )
         .detach();
 }
@@ -211,27 +211,27 @@ void MFManager::poll_pending()
     {
         const ViewStatus s = m_view_cache_status[view_id].load( std::memory_order_acquire );
 
-        if( m_in_range.count( view_id ) > 0 && s == ready )
+        if( m_in_range.count( view_id ) > 0 && s == ViewStatus::ready )
         {
-            m_view_cache_status[view_id].store( loaded, std::memory_order_relaxed );
-            emit_signal( "view_data_ready", view_id );
+            m_view_cache_status[view_id].store( ViewStatus::loaded, std::memory_order_relaxed );
+            emit_signal( "view_data_ready", m_active_path, view_id );
         }
-        else if( s == loaded || s == ready )
+        else if( s == ViewStatus::loaded || s == ViewStatus::ready )
         {
             m_view_cache[view_id].reset();
-            m_view_cache_status[view_id].store( unloaded, std::memory_order_relaxed );
+            m_view_cache_status[view_id].store( ViewStatus::unloaded, std::memory_order_relaxed );
         }
     }
 }
 
 bool MFManager::is_view_loaded( int view_id ) const
 {
-    return m_view_cache_status[view_id].load( std::memory_order_relaxed ) == loaded;
+    return m_view_cache_status[view_id].load( std::memory_order_relaxed ) == ViewStatus::loaded;
 }
 
 const MFManager::ViewCache* MFManager::get_view_cache( int view_id ) const
 {
-    if( m_view_cache_status[view_id].load( std::memory_order_relaxed ) != loaded )
+    if( m_view_cache_status[view_id].load( std::memory_order_relaxed ) != ViewStatus::loaded )
         return nullptr;
     return m_view_cache[view_id].get();
 }
@@ -240,7 +240,8 @@ void MFManager::_bind_methods()
 {
     ADD_SIGNAL( godot::MethodInfo( "current_view_changed", godot::PropertyInfo( godot::Variant::STRING, "path" ),
                                    godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
-    ADD_SIGNAL( godot::MethodInfo( "view_data_ready", godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
+    ADD_SIGNAL(
+        godot::MethodInfo( "view_data_ready", godot::PropertyInfo( godot::Variant::STRING, "path" ), godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "load", "path" ), &MFManager::load );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_active_path" ), &MFManager::get_active_path );
