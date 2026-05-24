@@ -58,7 +58,7 @@ class MFManager : public godot::Object
     godot::PackedVector3Array get_navmesh();
 
     // Triggers BFS-based eviction and async loading of nearby views.
-    bool set_current_view( int view_id );
+    bool load_from( int view_id );
 
     // Call once per frame from MFLevel::_process to promote finished loads into the cache.
     // Emits "view_data_ready" for each view that becomes available.
@@ -74,8 +74,8 @@ class MFManager : public godot::Object
 
     mft::Level m_level;
     godot::String m_active_path;
-    int m_current_view_id = -1;
     std::unordered_set<int> m_in_range;
+    bool m_process_connected = false;
 
     // Both sized to num_views on load(). Indexed by view_id.
     std::vector<std::unique_ptr<ViewCache>> m_view_cache;

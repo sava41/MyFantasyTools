@@ -3,8 +3,10 @@
 #include "jxl.h"
 
 #include <fstream>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -18,11 +20,25 @@ MFManager::MFManager()
 
 MFManager::~MFManager()
 {
+    auto* scene_tree = godot::Object::cast_to<godot::SceneTree>( godot::Engine::get_singleton()->get_main_loop() );
+    if( scene_tree )
+        scene_tree->disconnect( "process_frame", godot::Callable( this, "poll_pending" ) );
+
     m_static_inst = nullptr;
 }
 
 bool MFManager::load( const godot::String& path )
 {
+    if( !m_process_connected )
+    {
+        auto* scene_tree = godot::Object::cast_to<godot::SceneTree>( godot::Engine::get_singleton()->get_main_loop() );
+        if( scene_tree )
+        {
+            scene_tree->connect( "process_frame", godot::Callable( this, "poll_pending" ) );
+            m_process_connected = true;
+        }
+    }
+
     if( m_active_path == path )
         return true;
 
@@ -43,8 +59,7 @@ bool MFManager::load( const godot::String& path )
     m_view_cache.resize( num_views );
     m_view_cache_status = std::vector<std::atomic<ViewStatus>>( num_views );
 
-    m_active_path     = path;
-    m_current_view_id = -1;
+    m_active_path = path;
 
     return true;
 }
@@ -89,16 +104,16 @@ godot::PackedVector3Array MFManager::get_navmesh()
     return tris;
 }
 
-bool MFManager::set_current_view( int view_id )
+bool MFManager::load_from( int view_id )
 {
     if( m_active_path.is_empty() )
         return false;
 
     const int num_views = get_num_views();
-    if( view_id < 0 || view_id >= num_views || view_id == m_current_view_id )
+    if( view_id < 0 || view_id >= num_views )
+    {
         return false;
-
-    m_current_view_id = view_id;
+    }
 
     constexpr int k_max_hops = 2;
     m_in_range               = mft::get_views_in_range( m_level, view_id, k_max_hops );
@@ -110,8 +125,6 @@ bool MFManager::set_current_view( int view_id )
             begin_load_view( view );
         }
     }
-
-    emit_signal( "current_view_changed", m_active_path, view_id );
 
     return true;
 }
@@ -131,6 +144,8 @@ static godot::Image::Format channels_to_format( uint8_t channels )
 
 void MFManager::begin_load_view( int view_index )
 {
+    m_view_cache_status[view_index].store( ViewStatus::loading, std::memory_order_relaxed );
+
     const auto* view = m_level.fbs()->views()->Get( view_index );
 
     const auto* cd  = view->color_direct();
@@ -172,7 +187,6 @@ void MFManager::begin_load_view( int view_index )
           static_cast<size_t>( ld->res_x() ) * ld->res_y() * ld->channels() * sizeof( float ) },
     };
 
-    m_view_cache_status[view_index].store( ViewStatus::loading, std::memory_order_relaxed );
     m_view_cache[view_index] = std::move( cache );
 
     std::atomic<ViewStatus>* status = &m_view_cache_status[view_index];
@@ -193,9 +207,13 @@ void MFManager::begin_load_view( int view_index )
                 file.seekg( static_cast<std::streamoff>( img.file_offset ) );
                 file.read( compressed.data(), static_cast<std::streamsize>( img.compressed_size ) );
                 if( !file )
+                {
                     break;
+                }
                 if( !mft::jxl::decode_jxl( compressed.data(), img.compressed_size, img.out_buf, img.pixel_bytes ) )
+                {
                     break;
+                }
             }
 
             status->store( ViewStatus::ready, std::memory_order_release );
@@ -238,8 +256,6 @@ const MFManager::ViewCache* MFManager::get_view_cache( int view_id ) const
 
 void MFManager::_bind_methods()
 {
-    ADD_SIGNAL( godot::MethodInfo( "current_view_changed", godot::PropertyInfo( godot::Variant::STRING, "path" ),
-                                   godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
     ADD_SIGNAL(
         godot::MethodInfo( "view_data_ready", godot::PropertyInfo( godot::Variant::STRING, "path" ), godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
 
@@ -247,7 +263,8 @@ void MFManager::_bind_methods()
     godot::ClassDB::bind_method( godot::D_METHOD( "get_active_path" ), &MFManager::get_active_path );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_num_views" ), &MFManager::get_num_views );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_closest_view_id", "point" ), &MFManager::get_closest_view_id );
-    godot::ClassDB::bind_method( godot::D_METHOD( "set_current_view", "view_id" ), &MFManager::set_current_view );
+    godot::ClassDB::bind_method( godot::D_METHOD( "load_from", "view_id" ), &MFManager::load_from );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_navmesh" ), &MFManager::get_navmesh );
     godot::ClassDB::bind_method( godot::D_METHOD( "is_view_loaded", "view_id" ), &MFManager::is_view_loaded );
+    godot::ClassDB::bind_method( godot::D_METHOD( "poll_pending" ), &MFManager::poll_pending );
 }

@@ -31,11 +31,7 @@ MFLevel::~MFLevel()
 
 void MFLevel::_enter_tree()
 {
-    MFManager::get()->connect( "current_view_changed", godot::Callable( this, "_on_view_data_ready" ) );
-
-    m_min_view_duration_timer = memnew( godot::Timer() );
-    m_min_view_duration_timer->set_one_shot( true );
-    add_child( m_min_view_duration_timer );
+    MFManager::get()->connect( "view_data_ready", godot::Callable( this, "_on_view_data_ready" ) );
 
     m_collision = memnew( godot::StaticBody3D() );
     m_collision->set_owner( this );
@@ -112,7 +108,7 @@ void MFLevel::_on_view_data_ready( godot::String path, int view_id )
     {
         return;
     }
-    if( view_id != m_cur_view_id )
+    if( view_id != m_pending_view_id )
     {
         return;
     }
@@ -265,7 +261,7 @@ bool MFLevel::set_view( int view_id )
         return false;
     }
 
-    if( !MFManager::get()->set_current_view( view_id ) )
+    if( !MFManager::get()->load_from( view_id ) )
     {
         return false;
     }
@@ -274,16 +270,22 @@ bool MFLevel::set_view( int view_id )
     {
         apply_view( view_id );
     }
+    else
+    {
+        m_pending_view_id = view_id;
+    }
 
     return true;
 }
 
 bool MFLevel::apply_view( int view_id )
 {
-    if( m_min_view_duration_timer->get_time_left() != 0.0 )
+    if( view_id == m_cur_view_id )
     {
         return false;
     }
+
+    m_cur_view_id = view_id;
 
     const MFManager::ViewCache* cache = MFManager::get()->get_view_cache( view_id );
     if( !cache )
@@ -310,12 +312,6 @@ bool MFLevel::apply_view( int view_id )
     m_sky_material->set_panorama( godot::ImageTexture::create_from_image( cache->env ) );
 
     godot::UtilityFunctions::print( "set camera: ", godot::String( view->name()->c_str() ) );
-
-    m_min_view_duration_timer->start( m_min_view_duration );
-
-    m_cur_view_id = view_id;
-
-    emit_signal( "view_changed", view_id );
 
     return true;
 }

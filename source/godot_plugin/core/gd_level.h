@@ -62,11 +62,10 @@ class MFLevel : public godot::Node3D
     godot::Ref<godot::ShaderMaterial> m_background_material;
     godot::Ref<godot::PanoramaSkyMaterial> m_sky_material;
 
-    godot::Timer* m_min_view_duration_timer = nullptr;
-
     float m_min_view_duration;
 
-    int m_cur_view_id = -1;
+    int m_cur_view_id     = -1;
+    int m_pending_view_id = -1;
 
     godot::Transform3D m_cur_view_transform;
 
