@@ -15,10 +15,10 @@ namespace data = mft::data;
 // Image-type table shared by all modes
 // --------------------------------------------------------------------------
 
-static constexpr int NUM_IMAGE_TYPES = 5;
+static constexpr int NUM_IMAGE_TYPES = 4;
 
 static const char* IMAGE_TYPE_NAMES[NUM_IMAGE_TYPES] = {
-    "ColorDirect", "ColorIndirect", "Depth", "Environment", "LightDirection",
+    "ColorDirect", "ColorIndirect", "Depth", "Environment",
 };
 
 static const mft::ImageType IMAGE_TYPES[NUM_IMAGE_TYPES] = {
@@ -26,18 +26,16 @@ static const mft::ImageType IMAGE_TYPES[NUM_IMAGE_TYPES] = {
     mft::ImageType::ColorIndirect,
     mft::ImageType::Depth,
     mft::ImageType::Environment,
-    mft::ImageType::LightDirection,
 };
 
 static const data::ImageEntry* get_fbs_entry( const data::View* view, mft::ImageType type )
 {
     switch( type )
     {
-    case mft::ImageType::ColorDirect:    return view->color_direct();
-    case mft::ImageType::ColorIndirect:  return view->color_indirect();
-    case mft::ImageType::Depth:          return view->depth();
-    case mft::ImageType::Environment:    return view->environment();
-    case mft::ImageType::LightDirection: return view->light_direction();
+    case mft::ImageType::ColorDirect:   return view->color_direct();
+    case mft::ImageType::ColorIndirect: return view->color_indirect();
+    case mft::ImageType::Depth:         return view->depth();
+    case mft::ImageType::Environment:   return view->environment();
     }
     return nullptr;
 }

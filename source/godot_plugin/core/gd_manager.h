@@ -34,7 +34,6 @@ class MFManager : public godot::Object
         godot::Ref<godot::Image> color_indirect;
         godot::Ref<godot::Image> depth;
         godot::Ref<godot::Image> env;
-        godot::Ref<godot::Image> light_dir;
     };
 
     virtual ~MFManager() override;

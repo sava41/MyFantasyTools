@@ -2,7 +2,6 @@
 
 #include "gd_manager.h"
 
-#include <godot_cpp/classes/capsule_shape3d.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/environment.hpp>
@@ -114,63 +113,6 @@ void MFLevel::_on_view_data_ready( godot::String path, int view_id )
     }
 
     apply_view( view_id );
-}
-
-void MFLevel::update_shadows()
-{
-    if( m_editor_mode || !m_background_material.is_valid() )
-    {
-        return;
-    }
-
-    // Find all CollisionShape3D nodes with capsule shapes that have the shadow metadata
-    const int MAX_CAPSULES = 10;
-    godot::PackedVector3Array capsule_starts;
-    godot::PackedVector3Array capsule_ends;
-    godot::PackedFloat32Array capsule_radii;
-
-    capsule_starts.resize( MAX_CAPSULES );
-    capsule_ends.resize( MAX_CAPSULES );
-    capsule_radii.resize( MAX_CAPSULES );
-
-    int capsule_count = 0;
-
-    godot::TypedArray<godot::Node> nodes = get_tree()->get_nodes_in_group( "capsule_shadow" );
-
-    for( int i = 0; i < nodes.size() && capsule_count < MAX_CAPSULES; i++ )
-    {
-        godot::CollisionShape3D* collision_shape = godot::Object::cast_to<godot::CollisionShape3D>( nodes[i] );
-        if( !collision_shape )
-            continue;
-
-        godot::Ref<godot::CapsuleShape3D> capsule_shape = collision_shape->get_shape();
-        if( !capsule_shape.is_valid() )
-            continue;
-
-        godot::Transform3D world_transform = collision_shape->get_global_transform();
-        godot::Vector3 world_pos           = world_transform.origin;
-
-        float height = capsule_shape->get_height();
-        float radius = capsule_shape->get_radius();
-
-        godot::Vector3 scale = world_transform.basis.get_scale();
-
-        float half_height        = ( height * 0.5f - radius ) * scale.y;
-        float scaled_radius      = radius * ( ( scale.x + scale.z ) * 0.5f );
-        godot::Vector3 local_dir = godot::Vector3( 0, 1, 0 );
-        godot::Vector3 world_dir = world_transform.basis.xform( local_dir ).normalized();
-
-        capsule_starts[capsule_count] = world_pos - world_dir * half_height;
-        capsule_ends[capsule_count]   = world_pos + world_dir * half_height;
-        capsule_radii[capsule_count]  = scaled_radius;
-
-        capsule_count++;
-    }
-
-    m_background_material->set_shader_parameter( "capsule_starts", capsule_starts );
-    m_background_material->set_shader_parameter( "capsule_ends", capsule_ends );
-    m_background_material->set_shader_parameter( "capsule_radii", capsule_radii );
-    m_background_material->set_shader_parameter( "capsule_count", capsule_count );
 }
 
 void MFLevel::initialize_level_data()
@@ -299,7 +241,6 @@ bool MFLevel::apply_view( int view_id )
     m_background_material->set_shader_parameter( "color_direct", godot::ImageTexture::create_from_image( cache->color_direct ) );
     m_background_material->set_shader_parameter( "color_indirect", godot::ImageTexture::create_from_image( cache->color_indirect ) );
     m_background_material->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( cache->depth ) );
-    m_background_material->set_shader_parameter( "light_direction", godot::ImageTexture::create_from_image( cache->light_dir ) );
 
     m_game_camera->set_current( true );
     m_cur_view_transform = setup_camera( level, view_id, m_game_camera );
@@ -404,7 +345,6 @@ void MFLevel::_bind_methods()
     godot::ClassDB::bind_method( godot::D_METHOD( "set_view", "viewId" ), &MFLevel::set_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "set_closest_view", "point" ), &MFLevel::set_closest_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "look_at", "point", "clamp_region", "smooth_rate" ), &MFLevel::look_at );
-    godot::ClassDB::bind_method( godot::D_METHOD( "update_shadows" ), &MFLevel::update_shadows );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "set_min_view_duration", "time ms" ), &MFLevel::set_min_view_duration );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_min_view_duration" ), &MFLevel::get_min_view_duration );

@@ -152,7 +152,6 @@ void MFManager::begin_load_view( int view_index )
     const auto* ci  = view->color_indirect();
     const auto* dep = view->depth();
     const auto* env = view->environment();
-    const auto* ld  = view->light_direction();
 
     // Allocate Images on the main thread; the worker writes into their raw buffers.
     auto cache            = std::make_unique<ViewCache>();
@@ -160,7 +159,6 @@ void MFManager::begin_load_view( int view_index )
     cache->color_indirect = godot::Image::create( ci->res_x(), ci->res_y(), false, channels_to_format( ci->channels() ) );
     cache->depth          = godot::Image::create( dep->res_x(), dep->res_y(), false, channels_to_format( dep->channels() ) );
     cache->env            = godot::Image::create( env->res_x(), env->res_y(), false, channels_to_format( env->channels() ) );
-    cache->light_dir      = godot::Image::create( ld->res_x(), ld->res_y(), false, channels_to_format( ld->channels() ) );
 
     // Pre-extract all file offsets and pixel sizes before dispatching — avoids any
     // cross-thread access to the flatbuffer or the Level struct.
@@ -183,8 +181,6 @@ void MFManager::begin_load_view( int view_index )
           static_cast<size_t>( dep->res_x() ) * dep->res_y() * dep->channels() * sizeof( float ) },
         { blob + static_cast<size_t>( env->offset() ), static_cast<size_t>( env->size() ), const_cast<uint8_t*>( cache->env->get_data().ptr() ),
           static_cast<size_t>( env->res_x() ) * env->res_y() * env->channels() * sizeof( float ) },
-        { blob + static_cast<size_t>( ld->offset() ), static_cast<size_t>( ld->size() ), const_cast<uint8_t*>( cache->light_dir->get_data().ptr() ),
-          static_cast<size_t>( ld->res_x() ) * ld->res_y() * ld->channels() * sizeof( float ) },
     };
 
     m_view_cache[view_index] = std::move( cache );

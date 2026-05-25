@@ -18,7 +18,6 @@ namespace mft
         ColorIndirect,
         Depth,
         Environment,
-        LightDirection
     };
 
     struct Level

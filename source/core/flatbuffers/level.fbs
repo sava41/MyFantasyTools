@@ -61,7 +61,6 @@ table View {
   color_indirect:  ImageEntry;
   depth:           ImageEntry;
   environment:     ImageEntry;
-  light_direction: ImageEntry;
 }
 
 table Level {

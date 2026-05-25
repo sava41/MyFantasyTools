@@ -22,8 +22,6 @@ namespace mft
             return view->depth();
         case ImageType::Environment:
             return view->environment();
-        case ImageType::LightDirection:
-            return view->light_direction();
         }
         return nullptr;
     }
