@@ -33,6 +33,17 @@ struct Triangle {
   material_id: uint16;
 }
 
+enum LightType : byte {
+  Omni        = 0,
+  Directional = 1,
+  Spot        = 2,
+}
+
+table ShadowLight {
+  type:      LightType;
+  transform: Mat4;
+}
+
 // Byte range of a single image within the .mflevel image blob, plus its pixel dimensions and channel count.
 table ImageEntry {
   offset:   uint64;
@@ -72,6 +83,7 @@ table Level {
   navmesh_verts: [Vec3];
   navmesh_tris: [Triangle];
   uuid: string;          // UUID v4 assigned at export time (36-char canonical form)
+  shadow_lights: [ShadowLight];
 }
 
 root_type Level;

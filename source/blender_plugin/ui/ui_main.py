@@ -4,6 +4,12 @@ from bpy.types import Panel, UIList
 from ..core import data_models
 from ..core.color import CAMERA_COLOR_ATTR
 
+LIGHT_TYPE_ICONS = {
+    'POINT': 'LIGHT_POINT',
+    'SUN':   'LIGHT_SUN',
+    'SPOT':  'LIGHT_SPOT',
+}
+
 # Camera UIList
 class MFT_UL_CameraList(UIList):
     """Cameras"""
@@ -19,6 +25,21 @@ class MFT_UL_CameraList(UIList):
             layout.alignment = 'CENTER'
             layout.prop(item, "color", text="")
             layout.prop(item.camera, "name", text="", emboss=False, icon='CAMERA_DATA')
+
+class MFT_UL_ShadowLightList(UIList):
+    """Shadow Lights"""
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname):
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            row = layout.row(align=True)
+            if item.light:
+                light_icon = LIGHT_TYPE_ICONS.get(item.light.data.type, 'LIGHT')
+                row.prop(item.light, "name", text="", emboss=False, icon=light_icon)
+            else:
+                row.label(text="(missing)", icon='ERROR')
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label(text=item.light.name if item.light else "?")
+
 
 class MFT_PT_MainPanel(Panel):
     """My Fantasy Tools Main Panel"""
@@ -94,6 +115,17 @@ class MFT_PT_MainPanel(Panel):
                          text="Assign Selected Camera to Selected", icon='BRUSH_DATA')
 
         box = layout.box()
+        box.label(text="Shadow Lights")
+
+        row = box.row()
+        row.template_list("MFT_UL_ShadowLightList", "", scene, "mft_shadow_lights",
+                          scene, "mft_shadow_light_index", rows=3)
+
+        col = row.column(align=True)
+        col.operator("mft.add_shadow_light", icon='ADD', text="")
+        col.operator("mft.remove_shadow_light", icon='REMOVE', text="")
+
+        box = layout.box()
         box.label(text="Render Settings:")
         box.prop(scene.mft_global_settings, "render_width")
         box.prop(scene.mft_global_settings, "render_height")
@@ -123,6 +155,7 @@ def unregister_properties():
 
 classes = (
     MFT_UL_CameraList,
+    MFT_UL_ShadowLightList,
     MFT_PT_MainPanel,
 )
 

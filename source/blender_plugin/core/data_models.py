@@ -218,6 +218,16 @@ class MFT_Camera(PropertyGroup):
         default=(1.0, 1.0, 1.0)
     )
 
+class MFT_ShadowLight(PropertyGroup):
+    """A light object that casts shadows in the level"""
+    light: PointerProperty(
+        name="Light",
+        type=bpy.types.Object,
+        description="A light object (Point, Sun, or Spot) that casts shadows",
+        poll=lambda self, obj: obj.type == 'LIGHT' and obj.data.type in {'POINT', 'SUN', 'SPOT'}
+    )
+
+
 class MFT_GlobalSettings(PropertyGroup):
     """Group of global properties for the addon"""
     export_directory: StringProperty(
@@ -347,6 +357,49 @@ class MFT_OT_RemoveCamera(Operator):
         return {'FINISHED'}
 
 
+class MFT_OT_AddShadowLight(Operator):
+    """Add a light to the shadow caster list"""
+    bl_idname = "mft.add_shadow_light"
+    bl_label = "Add Shadow Light"
+    bl_description = "Add the selected Point, Sun, or Spot light to the shadow caster list"
+
+    def execute(self, context):
+        scene = context.scene
+        active_obj = context.active_object
+
+        if not active_obj or active_obj.type != 'LIGHT':
+            self.report({'ERROR'}, "Please select a light object")
+            return {'CANCELLED'}
+
+        if active_obj.data.type not in {'POINT', 'SUN', 'SPOT'}:
+            self.report({'ERROR'}, "Only Point, Sun, and Spot lights are supported")
+            return {'CANCELLED'}
+
+        for item in scene.mft_shadow_lights:
+            if item.light == active_obj:
+                self.report({'INFO'}, "Light already in list")
+                return {'CANCELLED'}
+
+        item = scene.mft_shadow_lights.add()
+        item.light = active_obj
+        return {'FINISHED'}
+
+
+class MFT_OT_RemoveShadowLight(Operator):
+    """Remove a light from the shadow caster list"""
+    bl_idname = "mft.remove_shadow_light"
+    bl_label = "Remove Shadow Light"
+    bl_description = "Remove the selected light from the shadow caster list"
+
+    def execute(self, context):
+        scene = context.scene
+        idx = scene.mft_shadow_light_index
+        if 0 <= idx < len(scene.mft_shadow_lights):
+            scene.mft_shadow_lights.remove(idx)
+            scene.mft_shadow_light_index = min(max(0, idx - 1), len(scene.mft_shadow_lights) - 1)
+        return {'FINISHED'}
+
+
 class MFT_OT_SetViewportCamera(Operator):
     """Toggle looking through the selected camera in the viewport"""
     bl_idname = "mft.set_viewport_camera"
@@ -441,18 +494,25 @@ def register_properties():
     bpy.types.Scene.mft_global_settings = PointerProperty(type=MFT_GlobalSettings)
     bpy.types.Scene.mft_cameras = CollectionProperty(type=MFT_Camera)
     bpy.types.Scene.mft_camera_index = IntProperty(default=0)
+    bpy.types.Scene.mft_shadow_lights = CollectionProperty(type=MFT_ShadowLight)
+    bpy.types.Scene.mft_shadow_light_index = IntProperty(default=0)
 
 
 def unregister_properties():
     del bpy.types.Scene.mft_global_settings
     del bpy.types.Scene.mft_cameras
     del bpy.types.Scene.mft_camera_index
+    del bpy.types.Scene.mft_shadow_lights
+    del bpy.types.Scene.mft_shadow_light_index
 
 classes = (
     MFT_GlobalSettings,
     MFT_Camera,
+    MFT_ShadowLight,
     MFT_OT_AddCamera,
     MFT_OT_RemoveCamera,
+    MFT_OT_AddShadowLight,
+    MFT_OT_RemoveShadowLight,
     MFT_OT_SetViewportCamera,
 )
 

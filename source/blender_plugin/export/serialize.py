@@ -8,6 +8,8 @@ from . data import View
 from . data import Level
 from  .data import Triangle
 from  .data import ImageEntry
+from  .data import ShadowLight
+from  .data import LightType
 
 from ..core import render_view
 from ..core import navmesh as navmesh_module
@@ -25,14 +27,23 @@ def _make_image_entry(builder, offset, size, res_x, res_y, channels):
     return ImageEntry.End(builder)
 
 
-def serialize_level(navmesh, views, image_entries=None) -> bytearray:
+_BLENDER_LIGHT_TYPE_MAP = {
+    'POINT': LightType.LightType.Omni,
+    'SUN':   LightType.LightType.Directional,
+    'SPOT':  LightType.LightType.Spot,
+}
+
+
+def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> bytearray:
     """Serialize level data to a FlatBuffer bytearray.
 
     image_entries: optional dict  {view_name: {type_name: (offset, size, res_x, res_y, channels)}}
-        where type_name is one of 'ColorDirect', 'ColorIndirect', 'Depth',
-        'Environment', 'LightDirection' and offset/size are byte positions
-        within the .mflevel image blob.  When None the legacy data_path field
-        is written instead (used by the standalone .level format).
+        where type_name is one of 'ColorDirect', 'ColorIndirect', 'Depth', 'Environment'
+        and offset/size are byte positions within the .mflevel image blob.
+        When None the legacy data_path field is written instead.
+
+    shadow_lights: optional list of MFT_ShadowLight property-group items whose
+        .light field points to a Blender light object.
     """
     if navmesh is None or views is None:
         return None
@@ -100,11 +111,10 @@ def serialize_level(navmesh, views, image_entries=None) -> bytearray:
             ),
         )
         View.AddAdjacentViews(builder, adjacent_views)
-        if 'ColorDirect'    in img_entries: View.AddColorDirect(builder,    img_entries['ColorDirect'])
-        if 'ColorIndirect'  in img_entries: View.AddColorIndirect(builder,  img_entries['ColorIndirect'])
-        if 'Depth'          in img_entries: View.AddDepth(builder,          img_entries['Depth'])
-        if 'Environment'    in img_entries: View.AddEnvironment(builder,    img_entries['Environment'])
-        if 'LightDirection' in img_entries: View.AddLightDirection(builder, img_entries['LightDirection'])
+        if 'ColorDirect'   in img_entries: View.AddColorDirect(builder,   img_entries['ColorDirect'])
+        if 'ColorIndirect' in img_entries: View.AddColorIndirect(builder, img_entries['ColorIndirect'])
+        if 'Depth'         in img_entries: View.AddDepth(builder,         img_entries['Depth'])
+        if 'Environment'   in img_entries: View.AddEnvironment(builder,   img_entries['Environment'])
         serialized_view = View.End(builder)
         serialized_views.append(serialized_view)
 
@@ -164,6 +174,32 @@ def serialize_level(navmesh, views, image_entries=None) -> bytearray:
     level_data_path = builder.CreateString("./views/") if image_entries is None else None
     level_uuid = builder.CreateString(str(uuid_module.uuid4()))
 
+    # Serialize shadow lights
+    serialized_shadow_lights = []
+    for sl_item in (shadow_lights or []):
+        if not sl_item.light or sl_item.light.data.type not in _BLENDER_LIGHT_TYPE_MAP:
+            continue
+        light_type = _BLENDER_LIGHT_TYPE_MAP[sl_item.light.data.type]
+        mx = sl_item.light.matrix_world
+        ShadowLight.Start(builder)
+        ShadowLight.AddType(builder, light_type)
+        ShadowLight.AddTransform(
+            builder,
+            Mat4.CreateMat4(
+                builder,
+                mx[0][0], mx[0][1], mx[0][2], mx[0][3],
+                mx[1][0], mx[1][1], mx[1][2], mx[1][3],
+                mx[2][0], mx[2][1], mx[2][2], mx[2][3],
+                mx[3][0], mx[3][1], mx[3][2], mx[3][3],
+            )
+        )
+        serialized_shadow_lights.append(ShadowLight.End(builder))
+
+    Level.StartShadowLightsVector(builder, len(serialized_shadow_lights))
+    for sl in reversed(serialized_shadow_lights):
+        builder.PrependUOffsetTRelative(sl)
+    shadow_lights_vec = builder.EndVector()
+
     Level.Start(builder)
     Level.AddNavmeshVerts(builder, navmesh_verts)
     Level.AddNavmeshTris(builder, navmesh_tris)
@@ -174,6 +210,7 @@ def serialize_level(navmesh, views, image_entries=None) -> bytearray:
     Level.AddTargetResX(builder, 1920)
     Level.AddTargetResY(builder, 1080)
     Level.AddUuid(builder, level_uuid)
+    Level.AddShadowLights(builder, shadow_lights_vec)
     level = Level.End(builder)
 
     builder.Finish(level, file_identifier=b'MFLV')

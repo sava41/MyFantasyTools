@@ -25,6 +25,7 @@ class MFT_OT_Export(Operator):
     _render_scene = None
     _views = []
     _navmesh = None
+    _shadow_lights = []
     _jxl_threads = []
     _comp_manager = None
     _next_index = False
@@ -70,8 +71,8 @@ class MFT_OT_Export(Operator):
                 image_blob = bytearray()
                 image_entries = {}  # {view_name: {type_name: (offset, size, res_x, res_y, channels)}}
 
-                IMAGE_TYPES = ['ColorDirect', 'ColorIndirect', 'Depth', 'Environment', 'LightDirection']
-                IMAGE_CHANNELS = {'ColorDirect': 3, 'ColorIndirect': 3, 'Depth': 1, 'LightDirection': 3, 'Environment': 3}
+                IMAGE_TYPES = ['ColorDirect', 'ColorIndirect', 'Depth', 'Environment']
+                IMAGE_CHANNELS = {'ColorDirect': 3, 'ColorIndirect': 3, 'Depth': 1, 'Environment': 3}
                 for view in self._views:
                     entries = {}
                     main_res_x = int(view._uncropped_res_x)
@@ -87,7 +88,7 @@ class MFT_OT_Export(Operator):
                     image_entries[view._name] = entries
 
                 # Serialize the FlatBuffer with image offsets embedded.
-                flatbuffer_bytes = serialize.serialize_level(self._navmesh, self._views, image_entries)
+                flatbuffer_bytes = serialize.serialize_level(self._navmesh, self._views, image_entries, self._shadow_lights)
 
                 # Write the .mflevel binary file:
                 #   4-byte LE size prefix | FlatBuffer ("MFLV" identifier at bytes [8..11]) | image blob
@@ -175,6 +176,7 @@ class MFT_OT_Export(Operator):
 
         self._views = create_view_list(enabled_cameras, str(export_path_root.resolve()), scene)
         self._navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
+        self._shadow_lights = list(scene.mft_shadow_lights)
 
         os.makedirs(export_path_final, exist_ok=True)
 
