@@ -181,8 +181,10 @@ def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> b
             continue
         light_type = _BLENDER_LIGHT_TYPE_MAP[sl_item.light.data.type]
         mx = sl_item.light.matrix_world
+        ld = sl_item.light.data
         ShadowLight.Start(builder)
         ShadowLight.AddType(builder, light_type)
+        ShadowLight.AddPower(builder, ld.energy)
         ShadowLight.AddTransform(
             builder,
             Mat4.CreateMat4(
@@ -192,6 +194,10 @@ def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> b
                 mx[2][0], mx[2][1], mx[2][2], mx[2][3],
                 mx[3][0], mx[3][1], mx[3][2], mx[3][3],
             )
+        )
+        ShadowLight.AddColor(
+            builder,
+            Vec3.CreateVec3(builder, ld.color[0], ld.color[1], ld.color[2])
         )
         serialized_shadow_lights.append(ShadowLight.End(builder))
 

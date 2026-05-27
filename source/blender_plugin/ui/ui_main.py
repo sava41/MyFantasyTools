@@ -135,7 +135,6 @@ class MFT_PT_MainPanel(Panel):
         box.label(text="Export Path:")
         box.prop(scene.mft_global_settings, "export_directory", text="")
 
-        box = layout.box()
         col = layout.column(align=True)
 
         if scene.mft_global_settings.is_rendering and scene.mft_global_settings.total_views > 0:

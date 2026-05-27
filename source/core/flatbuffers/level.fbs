@@ -42,6 +42,8 @@ enum LightType : byte {
 table ShadowLight {
   type:      LightType;
   transform: Mat4;
+  power:     float;
+  color:     Vec3;
 }
 
 // Byte range of a single image within the .mflevel image blob, plus its pixel dimensions and channel count.
