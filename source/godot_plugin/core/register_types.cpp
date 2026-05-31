@@ -1,5 +1,6 @@
 // Copied from godot-cpp/test/src and modified.
 
+#include "gd_background_effect.h"
 #include "gd_level.h"
 #include "gd_manager.h"
 
@@ -33,6 +34,7 @@ namespace
         {
             godot::ClassDB::register_class<MFManager>();
             godot::ClassDB::register_class<MFLevel>();
+            godot::ClassDB::register_class<MFBackgroundEffect>();
 
             mf_manager = memnew( MFManager );
 

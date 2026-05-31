@@ -1,13 +1,12 @@
 #pragma once
 
+#include "gd_background_effect.h"
 #include "mf_level.h"
 
 #include <godot_cpp/classes/camera3d.hpp>
 #include <godot_cpp/classes/collision_shape3d.hpp>
-#include <godot_cpp/classes/mesh_instance3d.hpp>
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/panorama_sky_material.hpp>
-#include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/classes/static_body3d.hpp>
 #include <godot_cpp/classes/timer.hpp>
 #include <godot_cpp/templates/vector.hpp>
@@ -53,11 +52,10 @@ class MFLevel : public godot::Node3D
 
     godot::Vector<godot::Camera3D*> m_editor_cameras;
     godot::Camera3D* m_game_camera             = nullptr;
-    godot::MeshInstance3D* m_background        = nullptr;
+    MFBackgroundEffect* m_background_effect    = nullptr;
     godot::StaticBody3D* m_collision           = nullptr;
     godot::CollisionShape3D* m_collision_shape = nullptr;
 
-    godot::Ref<godot::ShaderMaterial> m_background_material;
     godot::Ref<godot::PanoramaSkyMaterial> m_sky_material;
 
     float m_min_view_duration;

@@ -2,22 +2,20 @@
 
 #include "gd_manager.h"
 
+#include <godot_cpp/classes/compositor.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/environment.hpp>
-#include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
-#include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/shader.hpp>
 #include <godot_cpp/classes/sky.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 MFLevel::MFLevel( const godot::String& path )
-    : m_background_material( memnew( godot::ShaderMaterial ) )
-    , m_sky_material( memnew( godot::PanoramaSkyMaterial ) )
+    : m_sky_material( memnew( godot::PanoramaSkyMaterial ) )
     , m_min_view_duration( 0.5 )
     , m_level_file_path( path )
 {
@@ -38,29 +36,17 @@ void MFLevel::_enter_tree()
 
     if( !m_editor_mode )
     {
-        m_background = memnew( godot::MeshInstance3D() );
-        m_background->set_gi_mode( godot::GeometryInstance3D::GI_MODE_DISABLED );
-        m_background->set_cast_shadows_setting( godot::GeometryInstance3D::SHADOW_CASTING_SETTING_OFF );
+        m_background_effect = memnew( MFBackgroundEffect() );
+
+        godot::Array effects;
+        effects.push_back( m_background_effect );
+        godot::Ref<godot::Compositor> compositor = memnew( godot::Compositor );
+        compositor->set_compositor_effects( effects );
 
         m_game_camera = memnew( godot::Camera3D() );
         m_game_camera->set_keep_aspect_mode( godot::Camera3D::KEEP_WIDTH );
-        m_game_camera->add_child( m_background );
+        m_game_camera->set_compositor( compositor );
         add_child( m_game_camera );
-
-        godot::String shader = godot::FileAccess::get_file_as_string( "res://addons/mft_godot_plugin/background.gdshader" );
-
-        godot::Ref<godot::Shader> background_shader = memnew( godot::Shader );
-        background_shader->set_code( shader );
-
-        m_background_material->set_render_priority( godot::Material::RENDER_PRIORITY_MAX );
-        m_background_material->set_shader( background_shader );
-
-        godot::Ref<godot::QuadMesh> background_mesh = memnew( godot::QuadMesh );
-        background_mesh->set_size( { 2.0, 2.0 } );
-        background_mesh->set_flip_faces( false );
-        background_mesh->set_material( m_background_material );
-
-        m_background->set_mesh( background_mesh );
 
         godot::Ref<godot::Sky> sky = memnew( godot::Sky );
         sky->set_material( m_sky_material );
@@ -238,17 +224,18 @@ bool MFLevel::apply_view( int view_id )
     const mft::Level& level = MFManager::get()->get_level();
     const auto* view        = level.fbs()->views()->Get( view_id );
 
-    m_background_material->set_shader_parameter( "color_direct", godot::ImageTexture::create_from_image( cache->color_direct ) );
-    m_background_material->set_shader_parameter( "color_indirect", godot::ImageTexture::create_from_image( cache->color_indirect ) );
-    m_background_material->set_shader_parameter( "depth", godot::ImageTexture::create_from_image( cache->depth ) );
+    m_background_effect->set_view_textures(
+        godot::ImageTexture::create_from_image( cache->color_direct ),
+        godot::ImageTexture::create_from_image( cache->color_indirect ),
+        godot::ImageTexture::create_from_image( cache->depth ) );
 
     m_game_camera->set_current( true );
     m_cur_view_transform = setup_camera( level, view_id, m_game_camera );
 
-    m_background_material->set_shader_parameter( "fov", view->cropped_fov() );
-    m_background_material->set_shader_parameter( "uncropped_fov", view->fov() );
-    m_background_material->set_shader_parameter( "uncropped_aspect", view->aspect() );
-    m_background_material->set_shader_parameter( "uncropped_view_mat", m_cur_view_transform );
+    m_background_effect->set_view_params(
+        view->fov(),
+        view->aspect(),
+        m_cur_view_transform );
 
     m_sky_material->set_panorama( godot::ImageTexture::create_from_image( cache->env ) );
 
