@@ -21,6 +21,10 @@ set(JPEGXL_ENABLE_EXAMPLES OFF)
 set(JPEGXL_ENABLE_BENCHMARK OFF)
 set(JPEGXL_ENABLE_SJPEG OFF)
 
+# Prevent libjxl from configuring its bundled googletest — its copy is compiled
+# with -fvisibility=hidden which breaks RTTI linkage in our test binary.
+set(BUILD_TESTING OFF)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
