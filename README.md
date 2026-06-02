@@ -6,7 +6,7 @@
 
 This project is a pipeline for making pre-rendered background, fixed-perspective camera games like PS1 Resident Evil and Final Fantasy. The tools are intended to be an end-to-end solution from the creation of backgrounds in Blender to the loading of level data in your game engine of choice.
 
-![Example Video](docs/demo.webp)
+![Example Video](docs/demo.avif)
 
 ## Requirements
 - Blender 5.0
