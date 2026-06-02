@@ -199,10 +199,37 @@ jobs:
           path: dist/mft_blender_addon
 
   # ─────────────────────────────────────────────────────────────────
+  # Core library unit tests
+  # ─────────────────────────────────────────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Ninja
+        run: sudo apt-get install -y ninja-build
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_BLENDER_PLUGIN=OFF \
+            -DBUILD_GODOT_PLUGIN=OFF \
+            -DBUILD_TESTS=ON
+
+      - name: Build tests
+        run: cmake --build build --target mftest
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  # ─────────────────────────────────────────────────────────────────
   # Package Godot plugin (merge all platform artifacts)
   # ─────────────────────────────────────────────────────────────────
   package-godot:
-    needs: [godot-linux, godot-macos, godot-windows]
+    needs: [test, godot-linux, godot-macos, godot-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -222,7 +249,7 @@ jobs:
   # Package Blender addon (merge all platform artifacts)
   # ─────────────────────────────────────────────────────────────────
   package-blender:
-    needs: [blender-linux, blender-macos, blender-windows]
+    needs: [test, blender-linux, blender-macos, blender-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

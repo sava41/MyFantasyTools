@@ -12,3 +12,7 @@ if(BUILD_BLENDER_PLUGIN)
     add_subdirectory(external/imath)
     add_subdirectory(libpython)
 endif()
+
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

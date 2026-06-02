@@ -6,6 +6,11 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(BUILD_BLENDER_PLUGIN "Build Blender plugin" ON)
 option(BUILD_GODOT_PLUGIN "Build Godot plugin" ON)
+option(BUILD_TESTS "Build unit tests" ON)
+
+if(BUILD_TESTS)
+    enable_testing()
+endif()
 
 if(BUILD_BLENDER_PLUGIN)
     find_package(Python 3.11 EXACT COMPONENTS Interpreter Development REQUIRED)
