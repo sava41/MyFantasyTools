@@ -27,7 +27,7 @@ layout(set = 2, binding = 0, std140) uniform Params {
     int screen_h;
 } params;
 
-// ---- GTAO constants (match background.gdshader defaults) ----
+// ---- GTAO constants ----
 const uint  SECTOR_COUNT  = 32u;
 const int   SAMPLE_COUNT  = 3;
 const float SAMPLE_RADIUS = 0.15;
@@ -36,7 +36,7 @@ const float HIT_THICKNESS = 0.25;
 const float SAMPLE_OFFSET = 0.01;
 const float PI            = 3.14159265359;
 
-// ---- Helpers ported from background.gdshader ----
+// ---- Helpers ----
 
 float randf(int x, int y) {
     return mod(52.9829189 * mod(0.06711056 * float(x) + 0.00583715 * float(y), 1.0), 1.0);

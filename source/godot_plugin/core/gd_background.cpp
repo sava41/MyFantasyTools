@@ -1,4 +1,4 @@
-#include "gd_background_effect.h"
+#include "gd_background.h"
 
 #include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_file.hpp>

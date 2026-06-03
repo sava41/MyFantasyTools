@@ -1,6 +1,6 @@
 // Copied from godot-cpp/test/src and modified.
 
-#include "gd_background_effect.h"
+#include "gd_background.h"
 #include "gd_level.h"
 #include "gd_manager.h"
 

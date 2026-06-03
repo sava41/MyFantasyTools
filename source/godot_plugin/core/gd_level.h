@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gd_background_effect.h"
+#include "gd_background.h"
 #include "mf_level.h"
 
 #include <godot_cpp/classes/camera3d.hpp>

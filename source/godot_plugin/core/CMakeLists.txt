@@ -14,8 +14,8 @@ target_sources( mft_godot PRIVATE
     gd_manager.cpp
     gd_level.h
     gd_level.cpp
-    gd_background_effect.h
-    gd_background_effect.cpp
+    gd_background.h
+    gd_background.cpp
     register_types.cpp
 )
 
