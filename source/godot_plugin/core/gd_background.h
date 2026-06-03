@@ -23,13 +23,10 @@ class MFBackgroundEffect : public godot::CompositorEffect
 
     void _render_callback( int effect_callback_type, godot::RenderData* render_data ) override;
 
-    void set_view_textures( godot::Ref<godot::ImageTexture> color_direct,
-                            godot::Ref<godot::ImageTexture> color_indirect,
+    void set_view_textures( godot::Ref<godot::ImageTexture> color_direct, godot::Ref<godot::ImageTexture> color_indirect,
                             godot::Ref<godot::ImageTexture> depth_baked );
 
-    void set_view_params( float uncropped_fov,
-                          float uncropped_aspect,
-                          godot::Transform3D uncropped_view_mat );
+    void set_view_params( float uncropped_fov, float uncropped_aspect, godot::Transform3D uncropped_view_mat );
 
   private:
     // std140-compatible UBO layout (must match background_composite.glsl Params block)
@@ -50,7 +47,7 @@ class MFBackgroundEffect : public godot::CompositorEffect
     static void pack_projection( const godot::Projection& p, float* out );
     static void pack_transform( const godot::Transform3D& t, float* out );
 
-    void initialize( godot::RenderingDevice* rd );
+    void init( godot::RenderingDevice* rd, godot::RID color_tex );
 
     bool m_initialized = false;
 
@@ -58,8 +55,8 @@ class MFBackgroundEffect : public godot::CompositorEffect
     godot::Ref<godot::ImageTexture> m_color_direct;
     godot::Ref<godot::ImageTexture> m_color_indirect;
     godot::Ref<godot::ImageTexture> m_depth_baked;
-    float              m_uncropped_fov    = 1.0f;
-    float              m_uncropped_aspect = 1.0f;
+    float m_uncropped_fov    = 1.0f;
+    float m_uncropped_aspect = 1.0f;
     godot::Transform3D m_uncropped_view_mat;
 
     // RD resources (lifetime = plugin lifetime)
@@ -67,4 +64,8 @@ class MFBackgroundEffect : public godot::CompositorEffect
     godot::RID m_pipeline;
     godot::RID m_sampler;
     godot::RID m_params_buffer;
+    godot::RID m_vertex_buffer;
+    godot::RID m_vertex_array;
+    godot::RID m_params_uniform_set;
+    int64_t m_framebuffer_format = -1;
 };

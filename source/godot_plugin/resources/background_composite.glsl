@@ -1,20 +1,55 @@
-#[compute]
+#[vertex]
 
 #version 450
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(location = 0) in vec2 vertex_pos;  // uncropped NDC [-1, 1]
 
-// Set 0 — color buffer output (written as storage image)
-layout(rgba16f, set = 0, binding = 0) uniform restrict writeonly image2D color_image;
+layout(location = 0) out vec3 out_view_dir;  // uncropped view direction (z = -1)
+layout(location = 1) out vec2 out_uv;        // uncropped texture UV
 
-// Set 1 — baked textures + scene depth
+layout(set = 0, binding = 0, std140) uniform Params {
+    mat4 inv_projection;
+    mat4 projection;
+    mat4 view_matrix;            // world → view (VIEW_MATRIX)
+    mat4 inv_view_matrix;        // view → world (camera world transform)
+    mat4 uncropped_view_mat;     // uncropped camera → world
+    mat4 inv_uncropped_view_mat; // world → uncropped camera
+    float uncropped_fov;
+    float uncropped_aspect;
+    int screen_w;
+    int screen_h;
+} params;
+
+void main() {
+    float tan_h = tan(params.uncropped_fov * 0.5);
+    float tan_v = tan_h * params.uncropped_aspect;
+
+    // Point in uncropped view space at z = -1
+    vec4 view_dir = vec4(vertex_pos.x * tan_h, vertex_pos.y * tan_v, -1.0, 1.0);
+
+    // Transform chain: uncropped view → world → cropped view → clip
+    gl_Position = params.projection * params.view_matrix * params.uncropped_view_mat * view_dir;
+
+    out_view_dir = view_dir.xyz;
+    out_uv       = vec2(vertex_pos.x * 0.5 + 0.5, 0.5 - vertex_pos.y * 0.5);
+}
+
+
+#[fragment]
+
+#version 450
+
+layout(location = 0) in vec3 in_view_dir;
+layout(location = 1) in vec2 in_uv;
+
+layout(location = 0) out vec4 frag_color;
+
 layout(set = 1, binding = 0) uniform sampler2D color_direct_tex;
 layout(set = 1, binding = 1) uniform sampler2D color_indirect_tex;
 layout(set = 1, binding = 2) uniform sampler2D depth_baked_tex;
 layout(set = 1, binding = 3) uniform sampler2D scene_depth_tex;
 
-// Set 2 — per-frame params UBO (std140)
-layout(set = 2, binding = 0, std140) uniform Params {
+layout(set = 0, binding = 0, std140) uniform Params {
     mat4 inv_projection;
     mat4 projection;
     mat4 view_matrix;            // world → view (VIEW_MATRIX)
@@ -83,7 +118,7 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_point, vec3 view_normal, flo
         uint bitmask = 0u;
         for (int j = 0; j < SAMPLE_COUNT; j++) {
             for (float d = -1.0; d <= 1.0; d += 2.0) {
-                vec2  sUV  = clamp(screen_uv + uv_off * d, vec2(0.0), vec2(1.0));
+                vec2  sUV    = clamp(screen_uv + uv_off * d, vec2(0.0), vec2(1.0));
                 float sDepth = texture(scene_depth_tex, sUV).x;
 
                 vec4 sNDC  = vec4(sUV * 2.0 - 1.0, sDepth, 1.0);
@@ -114,42 +149,15 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_point, vec3 view_normal, flo
 // ---- Main ----
 
 void main() {
-    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
-    if (coord.x >= params.screen_w || coord.y >= params.screen_h) return;
-
     vec2 screen_size = vec2(params.screen_w, params.screen_h);
-    vec2 screen_uv   = (vec2(coord) + 0.5) / screen_size;
-    vec2 ndc         = screen_uv * 2.0 - 1.0;  // Vulkan NDC (y=-1 top, y=+1 bottom)
-
-    // ---- Compute uncropped UV ----
-    // Unproject screen pixel to view-space direction
-    vec4 view_h = params.inv_projection * vec4(ndc, 1.0, 1.0);
-    view_h.xyz /= view_h.w;
-
-    // view → world → uncropped camera
-    vec3 world_dir       = (params.inv_view_matrix   * vec4(view_h.xyz, 0.0)).xyz;
-    vec4 uncropped_h     =  params.inv_uncropped_view_mat * vec4(world_dir, 0.0);
-
-    // Scale so z = -1 (matching the original view_dir_uncropped convention)
-    if (abs(uncropped_h.z) < 1e-6) return;
-    vec3 uncropped_dir = uncropped_h.xyz / (-uncropped_h.z);  // z becomes -1
-
-    float tan_h = tan(params.uncropped_fov * 0.5);
-    float tan_v = tan_h * params.uncropped_aspect;
-
-    // ndc_uncropped is the UV-space position on the uncropped image
-    vec2 ndc_uncropped = vec2(uncropped_dir.x / tan_h, uncropped_dir.y / tan_v);
-    vec2 uv            = vec2( ndc_uncropped.x * 0.5 + 0.5, 0.5 - ndc_uncropped.y * 0.5 );
-
-    // Discard if this screen pixel is outside the uncropped image
-    if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) return;
+    vec2 screen_uv   = gl_FragCoord.xy / screen_size;
 
     // ---- Reconstruct background world position from baked depth ----
-    float linear_depth = texture(depth_baked_tex, uv).x;
-    // view_dir_uncropped.z == -1, so position = dir * linear_depth
-    vec3 uncropped_view_pos = vec3(uncropped_dir.x * linear_depth,
-                                   uncropped_dir.y * linear_depth,
-                                   -linear_depth);
+    // in_view_dir.z == -1 (set in vertex shader), so:
+    //   uncropped_view_pos = in_view_dir * linear_depth
+    // which gives z = -linear_depth, matching the original convention.
+    float linear_depth       = texture(depth_baked_tex, in_uv).x;
+    vec3  uncropped_view_pos = in_view_dir * linear_depth;
 
     vec4 world_depth_pt = params.uncropped_view_mat * vec4(uncropped_view_pos, 1.0);
     world_depth_pt.xyz /= world_depth_pt.w;
@@ -165,7 +173,7 @@ void main() {
     float scene_d = texture(scene_depth_tex, screen_uv).x;
 
     // In reverse-Z: larger = closer. Background visible where scene_d <= background_depth.
-    if (scene_d > background_depth + 1e-4) return;
+    if (scene_d > background_depth + 1e-4) discard;
 
     // ---- If scene geometry is closer, use it for GTAO position ----
     if (scene_d > background_depth) {
@@ -177,8 +185,8 @@ void main() {
     // ---- Surface normal estimate from scene depth derivatives ----
     vec2 texel = 1.0 / screen_size;
 
-    float d_r  = texture(scene_depth_tex, screen_uv + vec2(texel.x, 0.0)).x;
-    float d_u  = texture(scene_depth_tex, screen_uv + vec2(0.0, texel.y)).x;
+    float d_r = texture(scene_depth_tex, screen_uv + vec2(texel.x, 0.0)).x;
+    float d_u = texture(scene_depth_tex, screen_uv + vec2(0.0, texel.y)).x;
 
     vec4 vr = params.inv_projection * vec4((screen_uv + vec2(texel.x, 0.0)) * 2.0 - 1.0, d_r, 1.0);
     vec4 vu = params.inv_projection * vec4((screen_uv + vec2(0.0, texel.y)) * 2.0 - 1.0, d_u, 1.0);
@@ -191,12 +199,12 @@ void main() {
 
     // ---- GTAO ----
     vec2  aspect = screen_size.yx / screen_size.x;
-    float jitter = randf(coord.x, coord.y) - 0.5;
+    float jitter = randf(int(gl_FragCoord.x), int(gl_FragCoord.y)) - 0.5;
     float ao     = get_ao(screen_uv, aspect, view_depth_pos.xyz, normal, jitter);
 
     // ---- Composite ----
-    vec3 direct   = texture(color_direct_tex,   uv).rgb;
-    vec3 indirect = texture(color_indirect_tex, uv).rgb;
+    vec3 direct   = texture(color_direct_tex,   in_uv).rgb;
+    vec3 indirect = texture(color_indirect_tex, in_uv).rgb;
 
-    imageStore(color_image, coord, vec4(direct + indirect * ao, 1.0));
+    frag_color = vec4(direct + indirect * ao, 1.0);
 }
