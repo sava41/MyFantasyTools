@@ -8,4 +8,5 @@ FetchContent_Declare(
   GIT_TAG v23.5.26
 )
 
+set(FLATBUFFERS_BUILD_TESTS OFF)
 FetchContent_MakeAvailable(flatbuffers)
