@@ -44,6 +44,7 @@ class MFLevel : public godot::Node3D
     void setup_navmesh();
     bool apply_view( int view_id );
     void _on_view_data_ready( godot::String path, int view_id );
+    void _on_level_unloaded( godot::String path );
 
     static godot::Transform3D setup_camera( const mft::Level& level, int view_index, godot::Camera3D* camera );
 

@@ -42,6 +42,9 @@ bool MFManager::load( const godot::String& path )
     if( m_active_path == path )
         return true;
 
+    if( !m_active_path.is_empty() )
+        emit_signal( "level_unloaded", m_active_path );
+
     for( const auto& status : m_view_cache_status )
         while( status.load( std::memory_order_acquire ) == ViewStatus::loading )
             ;
@@ -254,6 +257,8 @@ void MFManager::_bind_methods()
 {
     ADD_SIGNAL(
         godot::MethodInfo( "view_data_ready", godot::PropertyInfo( godot::Variant::STRING, "path" ), godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
+    ADD_SIGNAL(
+        godot::MethodInfo( "level_unloaded", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "load", "path" ), &MFManager::load );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_active_path" ), &MFManager::get_active_path );

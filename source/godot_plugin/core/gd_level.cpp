@@ -29,6 +29,7 @@ MFLevel::~MFLevel()
 void MFLevel::_enter_tree()
 {
     MFManager::get()->connect( "view_data_ready", godot::Callable( this, "_on_view_data_ready" ) );
+    MFManager::get()->connect( "level_unloaded", godot::Callable( this, "_on_level_unloaded" ) );
 
     m_collision = memnew( godot::StaticBody3D() );
     m_collision->set_owner( this );
@@ -77,6 +78,7 @@ void MFLevel::_enter_tree()
 void MFLevel::_exit_tree()
 {
     MFManager::get()->disconnect( "view_data_ready", godot::Callable( this, "_on_view_data_ready" ) );
+    MFManager::get()->disconnect( "level_unloaded", godot::Callable( this, "_on_level_unloaded" ) );
 }
 
 void MFLevel::_ready()
@@ -85,6 +87,14 @@ void MFLevel::_ready()
 
 void MFLevel::_process( double /*delta*/ )
 {
+}
+
+void MFLevel::_on_level_unloaded( godot::String path )
+{
+    if( path != m_level_file_path )
+        return;
+    m_cur_view_id     = -1;
+    m_pending_view_id = -1;
 }
 
 void MFLevel::_on_view_data_ready( godot::String path, int view_id )
@@ -250,6 +260,9 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     if( m_editor_mode )
         return false;
 
+    if( m_cur_view_id < 0 )
+        return false;
+
     if( !MFManager::get()->load( m_level_file_path ) )
         return false;
 
@@ -327,6 +340,7 @@ void MFLevel::_bind_methods()
     ADD_SIGNAL( godot::MethodInfo( "level_load_failed", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
     ADD_SIGNAL( godot::MethodInfo( "view_changed", godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
 
+    godot::ClassDB::bind_method( godot::D_METHOD( "_on_level_unloaded", "path" ), &MFLevel::_on_level_unloaded );
     godot::ClassDB::bind_method( godot::D_METHOD( "_on_view_data_ready", "path", "view_id" ), &MFLevel::_on_view_data_ready );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "set_view", "viewId" ), &MFLevel::set_view );
