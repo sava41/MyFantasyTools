@@ -43,6 +43,9 @@ CMakeLists.txt.user
 *.blend
 mft_blender_addon.zip
 
+# Notes
+notes/
+
 # Folders
 build/
 output/
