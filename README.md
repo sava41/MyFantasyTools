@@ -8,7 +8,20 @@ A pipeline for making pre-rendered background, fixed-perspective camera games li
 
 ![Example Video](docs/demo.avif)
 
-## Docs
+## Features
+
+- Blender plugin for defining cameras, navmesh, shadow lights, and render settings in one panel
+- Camera rotation bounds system — author the allowed pan/tilt range per view and automatically determine the required background render size
+- Background rendering pipeline that bakes depth and lighting data alongside the beauty image
+- `.mflevel` file format — a single file containing all scene data for a level
+- Godot 4 plugin with an `MFLevel` node for importing and playing back levels
+- C++ library for reading `.mflevel` files in any engine
+
+## Getting Started
 
 - [Tutorial](docs/tutorial.md) — step-by-step guide from Blender scene setup to loading a level in Godot
 - [Building & Development](docs/building.md) — requirements, build instructions, and plugin development tips
+
+## License
+
+Released under the [MIT License](LICENSE).
