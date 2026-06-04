@@ -18,8 +18,8 @@ A pipeline for making pre-rendered background, fixed-perspective camera games li
 
 ## Getting Started
 
-- [Tutorial](docs/tutorial.md) — step-by-step guide from Blender scene setup to loading a level in Godot
-- [Building & Development](docs/building.md) — requirements, build instructions, and plugin development tips
+- [User Guide](docs/tutorial.md) — step-by-step guide from Blender scene setup to loading a level in Godot
+- [Building & Development](docs/building.md) — build instructions, and plugin development tips
 
 ## License
 
