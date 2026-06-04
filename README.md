@@ -1,10 +1,10 @@
-# My Fantasy Tools
-
 <p align="center">
 	<img src="docs/wizard.svg" height="200" alt="My Fantasy Tools logo">
 </p>
 
-A pipeline for making pre-rendered background, fixed-perspective camera games like PS1 Resident Evil and Final Fantasy. End-to-end tooling from background creation in Blender to level loading in your game engine.
+# My Fantasy Tools
+
+A pipeline for making pre-rendered background, fixed-perspective camera games like PS1 Resident Evil and Final Fantasy. End-to-end tooling from background creation in Blender to level loading in a game engine.
 
 ![Example Video](docs/demo.avif)
 
