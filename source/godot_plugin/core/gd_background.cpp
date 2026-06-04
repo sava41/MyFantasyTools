@@ -1,7 +1,6 @@
 #include "gd_background.h"
 
 #include <cassert>
-
 #include <godot_cpp/classes/rd_pipeline_color_blend_state.hpp>
 #include <godot_cpp/classes/rd_pipeline_color_blend_state_attachment.hpp>
 #include <godot_cpp/classes/rd_pipeline_depth_stencil_state.hpp>
@@ -16,6 +15,7 @@
 #include <godot_cpp/classes/rd_vertex_attribute.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 void MFBackgroundEffect::pack_projection( const godot::Projection& p, float* out )
@@ -162,8 +162,7 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex,
     u_params->set_uniform_type( godot::RenderingDevice::UNIFORM_TYPE_UNIFORM_BUFFER );
     u_params->set_binding( 0 );
     u_params->add_id( m_params_buffer );
-    godot::TypedArray<godot::RDUniform> params_arr;
-    params_arr.push_back( u_params );
+    auto params_arr             = godot::TypedArray<godot::RDUniform>( godot::Array::make( u_params ) );
     m_stage1_params_uniform_set = rd->uniform_set_create( params_arr, m_stage1_shader, 0 );
     m_stage2_params_uniform_set = rd->uniform_set_create( params_arr, m_stage2_shader, 0 );
 
@@ -182,22 +181,15 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex,
     attr->set_format( godot::RenderingDevice::DATA_FORMAT_R32G32_SFLOAT );
     attr->set_stride( 2 * sizeof( float ) );
     attr->set_offset( 0 );
-    godot::TypedArray<godot::RDVertexAttribute> vertex_attrs;
-    vertex_attrs.push_back( attr );
-    m_vertex_format = rd->vertex_format_create( vertex_attrs );
+    m_vertex_format = rd->vertex_format_create( godot::TypedArray<godot::RDVertexAttribute>( godot::Array::make( attr ) ) );
 
-    godot::TypedArray<godot::RID> vertex_bufs;
-    vertex_bufs.push_back( m_vertex_buffer );
     godot::PackedInt64Array vertex_offsets;
     vertex_offsets.push_back( 0 );
-    m_vertex_array = rd->vertex_array_create( 6, m_vertex_format, vertex_bufs, vertex_offsets );
+    m_vertex_array = rd->vertex_array_create( 6, m_vertex_format, godot::TypedArray<godot::RID>( godot::Array::make( m_vertex_buffer ) ), vertex_offsets );
 
     // ---- Stage 2 framebuffer format (color + depth) ----
     {
-        godot::TypedArray<godot::RID> probe_atts;
-        probe_atts.push_back( color_tex );
-        probe_atts.push_back( depth_tex );
-        godot::RID probe_fb = rd->framebuffer_create( probe_atts );
+        godot::RID probe_fb = rd->framebuffer_create( godot::TypedArray<godot::RID>( godot::Array::make( color_tex, depth_tex ) ) );
         m_stage2_fb_format  = rd->framebuffer_get_format( probe_fb );
         rd->free_rid( probe_fb );
     }
@@ -217,11 +209,9 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex,
 
         godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba;
         ba.instantiate();
-        godot::TypedArray<godot::RDPipelineColorBlendStateAttachment> blend_atts;
-        blend_atts.push_back( ba );
         godot::Ref<godot::RDPipelineColorBlendState> blend;
         blend.instantiate();
-        blend->set_attachments( blend_atts );
+        blend->set_attachments( godot::TypedArray<godot::RDPipelineColorBlendStateAttachment>( godot::Array::make( ba ) ) );
 
         m_stage2_pipeline = rd->render_pipeline_create( m_stage2_shader, m_stage2_fb_format, m_vertex_format,
                                                         godot::RenderingDevice::RENDER_PRIMITIVE_TRIANGLES, rast, ms, ds, blend );
@@ -277,12 +267,9 @@ void MFBackgroundEffect::create_render_textures( godot::RenderingDevice* rd, god
 
     // Probe Stage 1 framebuffer format from the actual intermediate textures
     {
-        godot::TypedArray<godot::RID> probe_atts;
-        probe_atts.push_back( m_beauty_texture );
-        probe_atts.push_back( m_ssao_texture );
-        probe_atts.push_back( m_bg_depth_texture );
-        godot::RID probe_fb = rd->framebuffer_create( probe_atts );
-        m_stage1_fb_format  = rd->framebuffer_get_format( probe_fb );
+        godot::RID probe_fb =
+            rd->framebuffer_create( godot::TypedArray<godot::RID>( godot::Array::make( m_beauty_texture, m_ssao_texture, m_bg_depth_texture ) ) );
+        m_stage1_fb_format = rd->framebuffer_get_format( probe_fb );
         rd->free_rid( probe_fb );
     }
 
@@ -294,19 +281,13 @@ void MFBackgroundEffect::create_render_textures( godot::RenderingDevice* rd, god
     godot::Ref<godot::RDPipelineDepthStencilState> ds;
     ds.instantiate();
 
-    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba0;
+    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba0, ba1, ba2;
     ba0.instantiate();
-    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba1;
     ba1.instantiate();
-    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba2;
     ba2.instantiate();
-    godot::TypedArray<godot::RDPipelineColorBlendStateAttachment> blend_atts;
-    blend_atts.push_back( ba0 );
-    blend_atts.push_back( ba1 );
-    blend_atts.push_back( ba2 );
     godot::Ref<godot::RDPipelineColorBlendState> blend;
     blend.instantiate();
-    blend->set_attachments( blend_atts );
+    blend->set_attachments( godot::TypedArray<godot::RDPipelineColorBlendStateAttachment>( godot::Array::make( ba0, ba1, ba2 ) ) );
 
     m_stage1_pipeline = rd->render_pipeline_create( m_stage1_shader, m_stage1_fb_format, m_vertex_format, godot::RenderingDevice::RENDER_PRIMITIVE_TRIANGLES,
                                                     rast, ms, ds, blend );
@@ -372,18 +353,13 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
     // Stage 1 — background.glsl: beauty + ssao + bg_depth outputs
     // =========================================================================
     {
-        godot::TypedArray<godot::RDUniform> set1;
-        set1.push_back( make_sampled( 0, color_direct_rd, m_sampler ) );
-        set1.push_back( make_sampled( 1, color_indirect_rd, m_sampler ) );
-        set1.push_back( make_sampled( 2, depth_baked_rd, m_sampler ) );
-        set1.push_back( make_sampled( 3, depth_tex, m_sampler ) );
-        godot::RID stage1_tex_set = rd->uniform_set_create( set1, m_stage1_shader, 1 );
+        godot::RID stage1_tex_set = rd->uniform_set_create( godot::TypedArray<godot::RDUniform>( godot::Array::make(
+                                                                make_sampled( 0, color_direct_rd, m_sampler ), make_sampled( 1, color_indirect_rd, m_sampler ),
+                                                                make_sampled( 2, depth_baked_rd, m_sampler ), make_sampled( 3, depth_tex, m_sampler ) ) ),
+                                                            m_stage1_shader, 1 );
 
-        godot::TypedArray<godot::RID> fb_atts;
-        fb_atts.push_back( m_beauty_texture );
-        fb_atts.push_back( m_ssao_texture );
-        fb_atts.push_back( m_bg_depth_texture );
-        godot::RID stage1_fb = rd->framebuffer_create( fb_atts, m_stage1_fb_format );
+        godot::RID stage1_fb = rd->framebuffer_create(
+            godot::TypedArray<godot::RID>( godot::Array::make( m_beauty_texture, m_ssao_texture, m_bg_depth_texture ) ), m_stage1_fb_format );
 
         // Clear ssao to ao=1.0 (no darkening at discarded/occluded pixels)
         // Clear bg_depth to 0.0 (no background → Stage 2 depth test won't pass)
@@ -408,15 +384,12 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
     // Stage 2 — background_composite.glsl: beauty → scene color, depth write
     // =========================================================================
     {
-        godot::TypedArray<godot::RDUniform> set1;
-        set1.push_back( make_sampled( 0, m_beauty_texture, m_sampler ) );
-        set1.push_back( make_sampled( 1, m_bg_depth_texture, m_sampler ) );
-        godot::RID composite_set = rd->uniform_set_create( set1, m_stage2_shader, 1 );
+        godot::RID composite_set =
+            rd->uniform_set_create( godot::TypedArray<godot::RDUniform>( godot::Array::make( make_sampled( 0, m_beauty_texture, m_sampler ),
+                                                                                             make_sampled( 1, m_bg_depth_texture, m_sampler ) ) ),
+                                    m_stage2_shader, 1 );
 
-        godot::TypedArray<godot::RID> fb_atts;
-        fb_atts.push_back( color_tex );
-        fb_atts.push_back( depth_tex );
-        godot::RID framebuffer = rd->framebuffer_create( fb_atts, m_stage2_fb_format );
+        godot::RID framebuffer = rd->framebuffer_create( godot::TypedArray<godot::RID>( godot::Array::make( color_tex, depth_tex ) ), m_stage2_fb_format );
 
         int64_t dl = rd->draw_list_begin( framebuffer );
         rd->draw_list_bind_render_pipeline( dl, m_stage2_pipeline );
