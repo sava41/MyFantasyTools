@@ -185,9 +185,8 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex,
     attr->set_offset( 0 );
     m_vertex_format = rd->vertex_format_create( godot::TypedArray<godot::RDVertexAttribute>( godot::Array::make( attr ) ) );
 
-    godot::PackedInt64Array vertex_offsets;
-    vertex_offsets.push_back( 0 );
-    m_vertex_array = rd->vertex_array_create( 6, m_vertex_format, godot::TypedArray<godot::RID>( godot::Array::make( m_vertex_buffer ) ), vertex_offsets );
+    m_vertex_array =
+        rd->vertex_array_create( 6, m_vertex_format, godot::TypedArray<godot::RID>( godot::Array::make( m_vertex_buffer ) ), godot::PackedInt64Array{ 0 } );
 
     // ---- Stage 2 framebuffer format (color + depth) ----
     {
@@ -365,12 +364,10 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
 
         // Clear ssao to ao=1.0 (no darkening at discarded/occluded pixels)
         // Clear bg_depth to 0.0 (no background → Stage 2 depth test won't pass)
-        godot::PackedColorArray clear_colors;
-        clear_colors.push_back( godot::Color( 0, 0, 0, 0 ) ); // beauty: don't care
-        clear_colors.push_back( godot::Color( 1, 0, 0, 1 ) ); // ssao: ao=1
-        clear_colors.push_back( godot::Color( 0, 0, 0, 0 ) ); // bg_depth: 0 = no background
-
-        int64_t dl = rd->draw_list_begin( stage1_fb, godot::RenderingDevice::DRAW_CLEAR_COLOR_1 | godot::RenderingDevice::DRAW_CLEAR_COLOR_2, clear_colors );
+        int64_t dl = rd->draw_list_begin( stage1_fb, godot::RenderingDevice::DRAW_CLEAR_COLOR_1 | godot::RenderingDevice::DRAW_CLEAR_COLOR_2,
+                                          godot::PackedColorArray{ { 0, 0, 0, 0 }, // beauty: don't care
+                                                                   { 1, 0, 0, 1 }, // ssao: ao=1
+                                                                   { 0, 0, 0, 0 } } );
         rd->draw_list_bind_render_pipeline( dl, m_stage1_pipeline );
         rd->draw_list_bind_uniform_set( dl, m_stage1_params_uniform_set, 0 );
         rd->draw_list_bind_uniform_set( dl, stage1_tex_set, 1 );
