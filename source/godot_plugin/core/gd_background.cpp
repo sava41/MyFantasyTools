@@ -1,5 +1,7 @@
 #include "gd_background.h"
 
+#include <cassert>
+
 #include <godot_cpp/classes/rd_pipeline_color_blend_state.hpp>
 #include <godot_cpp/classes/rd_pipeline_color_blend_state_attachment.hpp>
 #include <godot_cpp/classes/rd_pipeline_depth_stencil_state.hpp>
@@ -140,8 +142,7 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex,
     m_stage1_shader = load_shader( rd, "res://addons/mft_godot_plugin/background.glsl" );
     m_stage2_shader = load_shader( rd, "res://addons/mft_godot_plugin/background_composite.glsl" );
 
-    if( !m_stage1_shader.is_valid() || !m_stage2_shader.is_valid() )
-        return;
+    assert( m_stage1_shader.is_valid() && m_stage2_shader.is_valid() );
 
     // ---- Shared sampler ----
     godot::Ref<godot::RDSamplerState> ss;
