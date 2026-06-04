@@ -18,9 +18,7 @@ class MFT_UL_CameraList(UIList):
             row = layout.row(align=True)
             # Draw colored circle (read-only indicator)
             row.template_node_socket(color=(*item.color, 1.0))
-            # Camera name and enabled checkbox
             row.prop(item.camera, "name", text="", emboss=False, icon='CAMERA_DATA')
-            row.prop(item, "enabled", text="")
         elif self.layout_type in {'GRID'}:
             layout.alignment = 'CENTER'
             layout.prop(item, "color", text="")

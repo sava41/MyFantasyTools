@@ -169,12 +169,12 @@ class MFT_OT_Export(Operator):
             self.report({'ERROR'}, "No cameras in the list")
             return {'CANCELLED'}
 
-        enabled_cameras = [item for item in cameras if item.enabled and item.camera]
-        if len(enabled_cameras) == 0:
-            self.report({'ERROR'}, "No enabled cameras in the list")
+        valid_cameras = [item for item in cameras if item.camera]
+        if len(valid_cameras) == 0:
+            self.report({'ERROR'}, "No valid cameras in the list")
             return {'CANCELLED'}
 
-        self._views = create_view_list(enabled_cameras, str(export_path_root.resolve()), scene)
+        self._views = create_view_list(valid_cameras, str(export_path_root.resolve()), scene)
         self._navmesh = Navmesh(scene.mft_global_settings.navmesh_object)
         self._shadow_lights = list(scene.mft_shadow_lights)
 

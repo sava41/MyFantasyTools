@@ -16,7 +16,6 @@
 
 MFLevel::MFLevel( const godot::String& path )
     : m_sky_material( memnew( godot::PanoramaSkyMaterial ) )
-    , m_min_view_duration( 0.5 )
     , m_level_file_path( path )
 {
     m_editor_mode = godot::Engine::get_singleton()->is_editor_hint();
@@ -310,16 +309,6 @@ bool MFLevel::set_closest_view( const godot::Vector3& point )
     return set_view( view_id );
 }
 
-void MFLevel::set_min_view_duration( float timeMS )
-{
-    m_min_view_duration = timeMS;
-}
-
-float MFLevel::get_min_view_duration() const
-{
-    return m_min_view_duration;
-}
-
 void MFLevel::set_level_file_path( const godot::String& path )
 {
     if( path != m_level_file_path )
@@ -347,16 +336,10 @@ void MFLevel::_bind_methods()
     godot::ClassDB::bind_method( godot::D_METHOD( "set_closest_view", "point" ), &MFLevel::set_closest_view );
     godot::ClassDB::bind_method( godot::D_METHOD( "look_at", "point", "clamp_region", "smooth_rate" ), &MFLevel::look_at );
 
-    godot::ClassDB::bind_method( godot::D_METHOD( "set_min_view_duration", "time ms" ), &MFLevel::set_min_view_duration );
-    godot::ClassDB::bind_method( godot::D_METHOD( "get_min_view_duration" ), &MFLevel::get_min_view_duration );
-
     godot::ClassDB::bind_method( godot::D_METHOD( "set_level_file_path", "relative path to level file" ), &MFLevel::set_level_file_path );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_level_file_path" ), &MFLevel::get_level_file_path );
 
     // Properties.
-    ADD_GROUP( "View Properties", "" );
-    ADD_PROPERTY( godot::PropertyInfo( godot::Variant::FLOAT, "min_view_duration", godot::PROPERTY_HINT_RANGE, "0.0,10.0,0.01,or_greater,suffix:s" ),
-                  "set_min_view_duration", "get_min_view_duration" );
     ADD_PROPERTY( godot::PropertyInfo( godot::Variant::STRING, "level_file_path", godot::PROPERTY_HINT_FILE, "*.mflevel" ), "set_level_file_path",
                   "get_level_file_path" );
 }

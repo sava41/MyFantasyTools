@@ -5,7 +5,6 @@ from bpy.props import (
     StringProperty,
     PointerProperty,
     FloatProperty,
-    BoolProperty,
     CollectionProperty,
     IntProperty,
     FloatVectorProperty
@@ -186,11 +185,6 @@ class MFT_Camera(PropertyGroup):
         type=bpy.types.Object,
         description="A camera object in the scene",
         poll=lambda self, obj: obj.type == 'CAMERA'
-    )
-    enabled: BoolProperty(
-        name="Enabled",
-        description="Use this camera for rendering",
-        default=True
     )
     max_pan: FloatProperty(
         name="Max Pan",

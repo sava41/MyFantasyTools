@@ -8,7 +8,6 @@
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/panorama_sky_material.hpp>
 #include <godot_cpp/classes/static_body3d.hpp>
-#include <godot_cpp/classes/timer.hpp>
 #include <godot_cpp/templates/vector.hpp>
 #include <godot_cpp/variant/string.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -31,9 +30,6 @@ class MFLevel : public godot::Node3D
     bool set_view( int view_id );
     bool set_closest_view( const godot::Vector3& point );
     bool look_at( godot::Vector3 point, bool clamp_region = true, float smooth = 0.0 );
-
-    void set_min_view_duration( float timeMS );
-    float get_min_view_duration() const;
 
     void set_level_file_path( const godot::String& path );
     godot::String get_level_file_path() const;
@@ -58,8 +54,6 @@ class MFLevel : public godot::Node3D
     godot::CollisionShape3D* m_collision_shape = nullptr;
 
     godot::Ref<godot::PanoramaSkyMaterial> m_sky_material;
-
-    float m_min_view_duration;
 
     int m_cur_view_id     = -1;
     int m_pending_view_id = -1;
