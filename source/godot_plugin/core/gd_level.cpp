@@ -2,8 +2,8 @@
 
 #include "gd_manager.h"
 
+#include <cassert>
 #include <godot_cpp/classes/compositor.hpp>
-#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/classes/concave_polygon_shape3d.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/environment.hpp>
@@ -12,6 +12,7 @@
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/sky.hpp>
 #include <godot_cpp/core/math.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 MFLevel::MFLevel( const godot::String& path )
@@ -91,7 +92,10 @@ void MFLevel::_process( double /*delta*/ )
 void MFLevel::_on_level_unloaded( godot::String path )
 {
     if( path != m_level_file_path )
+    {
         return;
+    }
+
     m_cur_view_id     = -1;
     m_pending_view_id = -1;
 }
@@ -113,7 +117,9 @@ void MFLevel::_on_view_data_ready( godot::String path, int view_id )
 void MFLevel::initialize_level_data()
 {
     if( m_level_file_path.is_empty() || !m_level_ready )
+    {
         return;
+    }
 
     if( !MFManager::get()->load( m_level_file_path ) )
     {
@@ -233,18 +239,14 @@ bool MFLevel::apply_view( int view_id )
     const mft::Level& level = MFManager::get()->get_level();
     const auto* view        = level.fbs()->views()->Get( view_id );
 
-    m_background_effect->set_view_textures(
-        godot::ImageTexture::create_from_image( cache->color_direct ),
-        godot::ImageTexture::create_from_image( cache->color_indirect ),
-        godot::ImageTexture::create_from_image( cache->depth ) );
+    m_background_effect->set_view_textures( godot::ImageTexture::create_from_image( cache->color_direct ),
+                                            godot::ImageTexture::create_from_image( cache->color_indirect ),
+                                            godot::ImageTexture::create_from_image( cache->depth ) );
 
     m_game_camera->set_current( true );
     m_cur_view_transform = setup_camera( level, view_id, m_game_camera );
 
-    m_background_effect->set_view_params(
-        view->fov(),
-        view->aspect(),
-        m_cur_view_transform );
+    m_background_effect->set_view_params( view->fov(), view->aspect(), m_cur_view_transform );
 
     m_sky_material->set_panorama( godot::ImageTexture::create_from_image( cache->env ) );
 
@@ -259,8 +261,7 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     if( m_editor_mode )
         return false;
 
-    if( m_cur_view_id < 0 )
-        return false;
+    assert( m_cur_view_id >= 0 );
 
     if( !MFManager::get()->load( m_level_file_path ) )
         return false;
@@ -271,7 +272,9 @@ bool MFLevel::look_at( godot::Vector3 point, bool clamp_region, float smooth )
     const float max_tilt = view->max_tilt();
 
     if( max_pan == 0.0 && max_tilt == 0.0 )
+    {
         return false;
+    }
 
     const godot::Transform3D camera_transform_uncropped = m_cur_view_transform;
     const godot::Transform3D camera_transform           = m_game_camera->get_camera_transform();

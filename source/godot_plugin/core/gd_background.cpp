@@ -72,7 +72,9 @@ MFBackgroundEffect::~MFBackgroundEffect()
 {
     godot::RenderingDevice* rd = godot::RenderingServer::get_singleton()->get_rendering_device();
     if( !rd )
+    {
         return;
+    }
 
     free_if_valid( rd, m_bg_depth_texture );
     free_if_valid( rd, m_ssao_texture );
@@ -298,7 +300,9 @@ void MFBackgroundEffect::create_render_textures( godot::RenderingDevice* rd, god
 void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* render_data )
 {
     if( !m_color_direct.is_valid() || !m_color_indirect.is_valid() || !m_depth_baked.is_valid() )
+    {
         return;
+    }
 
     assert( render_data );
     godot::RenderingDevice* rd = godot::RenderingServer::get_singleton()->get_rendering_device();
@@ -325,7 +329,6 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
         m_intermediate_size = size;
     }
 
-    // ---- Upload BackgroundParams ----
     godot::RenderSceneData* scene_data = render_data->get_render_scene_data();
     godot::Transform3D cam_transform   = scene_data->get_cam_transform();
     godot::Projection cam_proj         = scene_data->get_cam_projection();
@@ -343,7 +346,6 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
     p.screen_h         = size.y;
     rd->buffer_update( m_params_buffer, 0, m_params_bytes.size(), m_params_bytes );
 
-    // ---- Get RD RIDs for baked textures ----
     godot::RenderingServer* rs   = godot::RenderingServer::get_singleton();
     godot::RID color_direct_rd   = rs->texture_get_rd_texture( m_color_direct->get_rid() );
     godot::RID color_indirect_rd = rs->texture_get_rd_texture( m_color_indirect->get_rid() );

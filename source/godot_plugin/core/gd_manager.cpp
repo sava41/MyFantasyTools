@@ -110,7 +110,9 @@ godot::PackedVector3Array MFManager::get_navmesh()
 bool MFManager::load_from( int view_id )
 {
     if( m_active_path.is_empty() )
+    {
         return false;
+    }
 
     const int num_views = get_num_views();
     if( view_id < 0 || view_id >= num_views )
@@ -257,8 +259,7 @@ void MFManager::_bind_methods()
 {
     ADD_SIGNAL(
         godot::MethodInfo( "view_data_ready", godot::PropertyInfo( godot::Variant::STRING, "path" ), godot::PropertyInfo( godot::Variant::INT, "view_id" ) ) );
-    ADD_SIGNAL(
-        godot::MethodInfo( "level_unloaded", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
+    ADD_SIGNAL( godot::MethodInfo( "level_unloaded", godot::PropertyInfo( godot::Variant::STRING, "path" ) ) );
 
     godot::ClassDB::bind_method( godot::D_METHOD( "load", "path" ), &MFManager::load );
     godot::ClassDB::bind_method( godot::D_METHOD( "get_active_path" ), &MFManager::get_active_path );
