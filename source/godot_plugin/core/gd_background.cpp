@@ -8,6 +8,8 @@
 #include <godot_cpp/classes/rd_sampler_state.hpp>
 #include <godot_cpp/classes/rd_shader_file.hpp>
 #include <godot_cpp/classes/rd_shader_spirv.hpp>
+#include <godot_cpp/classes/rd_texture_format.hpp>
+#include <godot_cpp/classes/rd_texture_view.hpp>
 #include <godot_cpp/classes/rd_uniform.hpp>
 #include <godot_cpp/classes/rd_vertex_attribute.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
@@ -52,6 +54,16 @@ MFBackgroundEffect::MFBackgroundEffect()
 {
     set_effect_callback_type( EFFECT_CALLBACK_TYPE_PRE_TRANSPARENT );
     set_enabled( true );
+    m_params_bytes.resize( sizeof( BackgroundParams ) );
+}
+
+static inline void free_if_valid( godot::RenderingDevice* rd, godot::RID& rid )
+{
+    if( rid.is_valid() )
+    {
+        rd->free_rid( rid );
+        rid = godot::RID();
+    }
 }
 
 MFBackgroundEffect::~MFBackgroundEffect()
@@ -59,20 +71,20 @@ MFBackgroundEffect::~MFBackgroundEffect()
     godot::RenderingDevice* rd = godot::RenderingServer::get_singleton()->get_rendering_device();
     if( !rd )
         return;
-    if( m_params_buffer.is_valid() )
-        rd->free_rid( m_params_buffer );
-    if( m_sampler.is_valid() )
-        rd->free_rid( m_sampler );
-    if( m_params_uniform_set.is_valid() )
-        rd->free_rid( m_params_uniform_set );
-    if( m_vertex_array.is_valid() )
-        rd->free_rid( m_vertex_array );
-    if( m_vertex_buffer.is_valid() )
-        rd->free_rid( m_vertex_buffer );
-    if( m_pipeline.is_valid() )
-        rd->free_rid( m_pipeline );
-    if( m_shader.is_valid() )
-        rd->free_rid( m_shader );
+
+    free_if_valid( rd, m_bg_depth_texture );
+    free_if_valid( rd, m_ssao_texture );
+    free_if_valid( rd, m_beauty_texture );
+    free_if_valid( rd, m_stage2_params_uniform_set );
+    free_if_valid( rd, m_stage1_params_uniform_set );
+    free_if_valid( rd, m_params_buffer );
+    free_if_valid( rd, m_sampler );
+    free_if_valid( rd, m_vertex_array );
+    free_if_valid( rd, m_vertex_buffer );
+    free_if_valid( rd, m_stage1_pipeline );
+    free_if_valid( rd, m_stage1_shader );
+    free_if_valid( rd, m_stage2_pipeline );
+    free_if_valid( rd, m_stage2_shader );
 }
 
 void MFBackgroundEffect::set_view_textures( godot::Ref<godot::ImageTexture> color_direct, godot::Ref<godot::ImageTexture> color_indirect,
@@ -90,28 +102,48 @@ void MFBackgroundEffect::set_view_params( float uncropped_fov, float uncropped_a
     m_uncropped_view_mat = uncropped_view_mat;
 }
 
-void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex )
+// ---- Helpers ----------------------------------------------------------------
+
+static godot::RID load_shader( godot::RenderingDevice* rd, const char* path )
 {
-    m_initialized = true;
-
-    godot::Ref<godot::RDShaderFile> shader_file = godot::ResourceLoader::get_singleton()->load( "res://addons/mft_godot_plugin/background_composite.glsl" );
-
-    if( !shader_file.is_valid() )
+    godot::Ref<godot::RDShaderFile> file = godot::ResourceLoader::get_singleton()->load( path );
+    if( !file.is_valid() )
     {
-        godot::UtilityFunctions::printerr( "MFBackgroundEffect: could not load background_composite.glsl" );
-        return;
+        godot::UtilityFunctions::printerr( godot::String( "MFBackgroundEffect: could not load " ) + path );
+        return godot::RID();
     }
-
-    godot::Ref<godot::RDShaderSPIRV> spirv = shader_file->get_spirv();
+    godot::Ref<godot::RDShaderSPIRV> spirv = file->get_spirv();
     if( !spirv.is_valid() )
     {
-        godot::UtilityFunctions::printerr( "MFBackgroundEffect: shader has no SPIRV" );
-        return;
+        godot::UtilityFunctions::printerr( godot::String( "MFBackgroundEffect: no SPIRV in " ) + path );
+        return godot::RID();
     }
+    return rd->shader_create_from_spirv( spirv );
+}
 
-    m_shader = rd->shader_create_from_spirv( spirv );
+static inline godot::Ref<godot::RDUniform> make_sampled( int binding, godot::RID tex, godot::RID sampler )
+{
+    godot::Ref<godot::RDUniform> u;
+    u.instantiate();
+    u->set_uniform_type( godot::RenderingDevice::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE );
+    u->set_binding( binding );
+    u->add_id( sampler );
+    u->add_id( tex );
+    return u;
+}
 
-    // Linear-clamp sampler for baked textures
+// ---- Initialization ---------------------------------------------------------
+
+void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex, godot::RID depth_tex )
+{
+    // ---- Shaders ----
+    m_stage1_shader = load_shader( rd, "res://addons/mft_godot_plugin/background.glsl" );
+    m_stage2_shader = load_shader( rd, "res://addons/mft_godot_plugin/background_composite.glsl" );
+
+    if( !m_stage1_shader.is_valid() || !m_stage2_shader.is_valid() )
+        return;
+
+    // ---- Shared sampler ----
     godot::Ref<godot::RDSamplerState> ss;
     ss.instantiate();
     ss->set_min_filter( godot::RenderingDevice::SAMPLER_FILTER_LINEAR );
@@ -121,7 +153,7 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex 
     ss->set_repeat_v( godot::RenderingDevice::SAMPLER_REPEAT_MODE_CLAMP_TO_EDGE );
     m_sampler = rd->sampler_create( ss );
 
-    // Persistent params UBO and its uniform set (set 0, shared by vertex and fragment)
+    // ---- Params UBO (set 0) — one per shader due to differing stage visibility ----
     m_params_buffer = rd->uniform_buffer_create( sizeof( BackgroundParams ) );
 
     godot::Ref<godot::RDUniform> u_params;
@@ -129,11 +161,12 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex 
     u_params->set_uniform_type( godot::RenderingDevice::UNIFORM_TYPE_UNIFORM_BUFFER );
     u_params->set_binding( 0 );
     u_params->add_id( m_params_buffer );
-    godot::TypedArray<godot::RDUniform> params_set;
-    params_set.push_back( u_params );
-    m_params_uniform_set = rd->uniform_set_create( params_set, m_shader, 0 );
+    godot::TypedArray<godot::RDUniform> params_arr;
+    params_arr.push_back( u_params );
+    m_stage1_params_uniform_set = rd->uniform_set_create( params_arr, m_stage1_shader, 0 );
+    m_stage2_params_uniform_set = rd->uniform_set_create( params_arr, m_stage2_shader, 0 );
 
-    // Fullscreen quad in uncropped NDC space (two triangles)
+    // ---- Fullscreen quad ----
     float quad[] = {
         -1.0f, -1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, 1.0f,
     };
@@ -150,90 +183,172 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex 
     attr->set_offset( 0 );
     godot::TypedArray<godot::RDVertexAttribute> vertex_attrs;
     vertex_attrs.push_back( attr );
-    int64_t vertex_format = rd->vertex_format_create( vertex_attrs );
+    m_vertex_format = rd->vertex_format_create( vertex_attrs );
 
     godot::TypedArray<godot::RID> vertex_bufs;
     vertex_bufs.push_back( m_vertex_buffer );
     godot::PackedInt64Array vertex_offsets;
     vertex_offsets.push_back( 0 );
-    m_vertex_array = rd->vertex_array_create( 6, vertex_format, vertex_bufs, vertex_offsets );
+    m_vertex_array = rd->vertex_array_create( 6, m_vertex_format, vertex_bufs, vertex_offsets );
 
-    // Probe the framebuffer format from the actual color texture so it always matches.
+    // ---- Stage 2 framebuffer format (color + depth) ----
     {
         godot::TypedArray<godot::RID> probe_atts;
         probe_atts.push_back( color_tex );
-        godot::RID probe_fb  = rd->framebuffer_create( probe_atts );
-        m_framebuffer_format = rd->framebuffer_get_format( probe_fb );
+        probe_atts.push_back( depth_tex );
+        godot::RID probe_fb = rd->framebuffer_create( probe_atts );
+        m_stage2_fb_format  = rd->framebuffer_get_format( probe_fb );
         rd->free_rid( probe_fb );
     }
 
-    // Render pipeline
+    // ---- Stage 2 render pipeline (depth test GREATER + depth write) ----
+    {
+        godot::Ref<godot::RDPipelineRasterizationState> rast;
+        rast.instantiate();
+        godot::Ref<godot::RDPipelineMultisampleState> ms;
+        ms.instantiate();
+
+        godot::Ref<godot::RDPipelineDepthStencilState> ds;
+        ds.instantiate();
+        ds->set_enable_depth_test( true );
+        ds->set_enable_depth_write( true );
+        ds->set_depth_compare_operator( godot::RenderingDevice::COMPARE_OP_GREATER );
+
+        godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba;
+        ba.instantiate();
+        godot::TypedArray<godot::RDPipelineColorBlendStateAttachment> blend_atts;
+        blend_atts.push_back( ba );
+        godot::Ref<godot::RDPipelineColorBlendState> blend;
+        blend.instantiate();
+        blend->set_attachments( blend_atts );
+
+        m_stage2_pipeline = rd->render_pipeline_create( m_stage2_shader, m_stage2_fb_format, m_vertex_format,
+                                                        godot::RenderingDevice::RENDER_PRIMITIVE_TRIANGLES, rast, ms, ds, blend );
+    }
+
+    // Stage 1 pipeline is deferred to ensure_intermediate_textures (needs fb format
+    // from the actual intermediate texture dimensions which aren't known yet).
+}
+
+void MFBackgroundEffect::create_render_textures( godot::RenderingDevice* rd, godot::Vector2i size )
+{
+    if( m_beauty_texture.is_valid() )
+        rd->free_rid( m_beauty_texture );
+    if( m_ssao_texture.is_valid() )
+        rd->free_rid( m_ssao_texture );
+    if( m_bg_depth_texture.is_valid() )
+        rd->free_rid( m_bg_depth_texture );
+    if( m_stage1_pipeline.is_valid() )
+        rd->free_rid( m_stage1_pipeline );
+
+    // RGBA16F for beauty and ssao
+    godot::Ref<godot::RDTextureFormat> rgba_fmt;
+    rgba_fmt.instantiate();
+    rgba_fmt->set_format( godot::RenderingDevice::DATA_FORMAT_R16G16B16A16_SFLOAT );
+    rgba_fmt->set_width( size.x );
+    rgba_fmt->set_height( size.y );
+    rgba_fmt->set_depth( 1 );
+    rgba_fmt->set_array_layers( 1 );
+    rgba_fmt->set_mipmaps( 1 );
+    rgba_fmt->set_texture_type( godot::RenderingDevice::TEXTURE_TYPE_2D );
+    rgba_fmt->set_usage_bits( godot::RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | godot::RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
+                              godot::RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT );
+
+    // R32F for bg_depth (higher precision needed for clip-space depth values)
+    godot::Ref<godot::RDTextureFormat> r32_fmt;
+    r32_fmt.instantiate();
+    r32_fmt->set_format( godot::RenderingDevice::DATA_FORMAT_R32_SFLOAT );
+    r32_fmt->set_width( size.x );
+    r32_fmt->set_height( size.y );
+    r32_fmt->set_depth( 1 );
+    r32_fmt->set_array_layers( 1 );
+    r32_fmt->set_mipmaps( 1 );
+    r32_fmt->set_texture_type( godot::RenderingDevice::TEXTURE_TYPE_2D );
+    r32_fmt->set_usage_bits( godot::RenderingDevice::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT | godot::RenderingDevice::TEXTURE_USAGE_SAMPLING_BIT |
+                             godot::RenderingDevice::TEXTURE_USAGE_CAN_COPY_FROM_BIT );
+
+    godot::Ref<godot::RDTextureView> view;
+    view.instantiate();
+
+    m_beauty_texture   = rd->texture_create( rgba_fmt, view );
+    m_ssao_texture     = rd->texture_create( rgba_fmt, view );
+    m_bg_depth_texture = rd->texture_create( r32_fmt, view );
+
+    // Probe Stage 1 framebuffer format from the actual intermediate textures
+    {
+        godot::TypedArray<godot::RID> probe_atts;
+        probe_atts.push_back( m_beauty_texture );
+        probe_atts.push_back( m_ssao_texture );
+        probe_atts.push_back( m_bg_depth_texture );
+        godot::RID probe_fb = rd->framebuffer_create( probe_atts );
+        m_stage1_fb_format  = rd->framebuffer_get_format( probe_fb );
+        rd->free_rid( probe_fb );
+    }
+
+    // Stage 1 pipeline: three color outputs, no depth test/write
     godot::Ref<godot::RDPipelineRasterizationState> rast;
     rast.instantiate();
-
     godot::Ref<godot::RDPipelineMultisampleState> ms;
     ms.instantiate();
-
     godot::Ref<godot::RDPipelineDepthStencilState> ds;
     ds.instantiate();
 
-    godot::Ref<godot::RDPipelineColorBlendStateAttachment> blend_att;
-    blend_att.instantiate();
+    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba0;
+    ba0.instantiate();
+    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba1;
+    ba1.instantiate();
+    godot::Ref<godot::RDPipelineColorBlendStateAttachment> ba2;
+    ba2.instantiate();
     godot::TypedArray<godot::RDPipelineColorBlendStateAttachment> blend_atts;
-    blend_atts.push_back( blend_att );
-
+    blend_atts.push_back( ba0 );
+    blend_atts.push_back( ba1 );
+    blend_atts.push_back( ba2 );
     godot::Ref<godot::RDPipelineColorBlendState> blend;
     blend.instantiate();
     blend->set_attachments( blend_atts );
 
-    m_pipeline =
-        rd->render_pipeline_create( m_shader, m_framebuffer_format, vertex_format, godot::RenderingDevice::RENDER_PRIMITIVE_TRIANGLES, rast, ms, ds, blend );
+    m_stage1_pipeline = rd->render_pipeline_create( m_stage1_shader, m_stage1_fb_format, m_vertex_format, godot::RenderingDevice::RENDER_PRIMITIVE_TRIANGLES,
+                                                    rast, ms, ds, blend );
 }
 
-static inline godot::Ref<godot::RDUniform> make_sampled( int binding, godot::RID tex, godot::RID sampler )
-{
-    godot::Ref<godot::RDUniform> u;
-    u.instantiate();
-    u->set_uniform_type( godot::RenderingDevice::UNIFORM_TYPE_SAMPLER_WITH_TEXTURE );
-    u->set_binding( binding );
-    u->add_id( sampler );
-    u->add_id( tex );
-    return u;
-}
+// ---- Render callback --------------------------------------------------------
 
 void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* render_data )
 {
     if( !m_color_direct.is_valid() || !m_color_indirect.is_valid() || !m_depth_baked.is_valid() )
         return;
 
+    assert( render_data );
     godot::RenderingDevice* rd = godot::RenderingServer::get_singleton()->get_rendering_device();
-    if( !rd || !render_data )
-        return;
+    assert( rd );
 
-    // Scene buffers & render size
     godot::Ref<godot::RenderSceneBuffersRD> buffers = render_data->get_render_scene_buffers();
-    if( !buffers.is_valid() )
-        return;
+    assert( buffers.is_valid() );
 
     godot::Vector2i size = buffers->get_internal_size();
-    if( size.x == 0 || size.y == 0 )
-        return;
+    assert( size.x > 0 && size.y > 0 );
 
     godot::RID color_tex = buffers->get_color_texture();
-
-    if( !m_initialized )
-        init( rd, color_tex );
-    if( !m_pipeline.is_valid() )
-        return;
     godot::RID depth_tex = buffers->get_depth_texture();
 
+    if( !m_initialized )
+    {
+        init( rd, color_tex, depth_tex );
+        m_initialized = true;
+    }
+
+    if( m_intermediate_size != size )
+    {
+        create_render_textures( rd, size );
+        m_intermediate_size = size;
+    }
+
+    // ---- Upload BackgroundParams ----
     godot::RenderSceneData* scene_data = render_data->get_render_scene_data();
     godot::Transform3D cam_transform   = scene_data->get_cam_transform();
     godot::Projection cam_proj         = scene_data->get_cam_projection();
 
-    godot::PackedByteArray params_bytes;
-    params_bytes.resize( sizeof( BackgroundParams ) );
-    BackgroundParams& p = *reinterpret_cast<BackgroundParams*>( params_bytes.ptrw() );
+    BackgroundParams& p = *reinterpret_cast<BackgroundParams*>( m_params_bytes.ptrw() );
     pack_projection( cam_proj.inverse(), p.inv_projection );
     pack_projection( cam_proj, p.projection );
     pack_transform( cam_transform.affine_inverse(), p.view_matrix );
@@ -244,38 +359,75 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
     p.uncropped_aspect = m_uncropped_aspect;
     p.screen_w         = size.x;
     p.screen_h         = size.y;
-    rd->buffer_update( m_params_buffer, 0, params_bytes.size(), params_bytes );
+    rd->buffer_update( m_params_buffer, 0, m_params_bytes.size(), m_params_bytes );
 
+    // ---- Get RD RIDs for baked textures ----
     godot::RenderingServer* rs   = godot::RenderingServer::get_singleton();
     godot::RID color_direct_rd   = rs->texture_get_rd_texture( m_color_direct->get_rid() );
     godot::RID color_indirect_rd = rs->texture_get_rd_texture( m_color_indirect->get_rid() );
     godot::RID depth_baked_rd    = rs->texture_get_rd_texture( m_depth_baked->get_rid() );
 
-    // Set 1: baked textures + scene depth
-    godot::TypedArray<godot::RDUniform> textures_set;
-    textures_set.push_back( make_sampled( 0, color_direct_rd, m_sampler ) );
-    textures_set.push_back( make_sampled( 1, color_indirect_rd, m_sampler ) );
-    textures_set.push_back( make_sampled( 2, depth_baked_rd, m_sampler ) );
-    textures_set.push_back( make_sampled( 3, depth_tex, m_sampler ) );
-    godot::RID textures_uniform_set = rd->uniform_set_create( textures_set, m_shader, 1 );
+    // =========================================================================
+    // Stage 1 — background.glsl: beauty + ssao + bg_depth outputs
+    // =========================================================================
+    {
+        godot::TypedArray<godot::RDUniform> set1;
+        set1.push_back( make_sampled( 0, color_direct_rd, m_sampler ) );
+        set1.push_back( make_sampled( 1, color_indirect_rd, m_sampler ) );
+        set1.push_back( make_sampled( 2, depth_baked_rd, m_sampler ) );
+        set1.push_back( make_sampled( 3, depth_tex, m_sampler ) );
+        godot::RID stage1_tex_set = rd->uniform_set_create( set1, m_stage1_shader, 1 );
 
-    // Create a color-only framebuffer for this frame's color texture
-    godot::TypedArray<godot::RID> fb_atts;
-    fb_atts.push_back( color_tex );
-    godot::RID framebuffer = rd->framebuffer_create( fb_atts, m_framebuffer_format );
+        godot::TypedArray<godot::RID> fb_atts;
+        fb_atts.push_back( m_beauty_texture );
+        fb_atts.push_back( m_ssao_texture );
+        fb_atts.push_back( m_bg_depth_texture );
+        godot::RID stage1_fb = rd->framebuffer_create( fb_atts, m_stage1_fb_format );
 
-    // Draw the quad — default DrawFlags (0) = load existing color, store result.
-    // Pixels discarded by the fragment shader retain their 3D scene color.
-    int64_t dl = rd->draw_list_begin( framebuffer );
-    rd->draw_list_bind_render_pipeline( dl, m_pipeline );
-    rd->draw_list_bind_uniform_set( dl, m_params_uniform_set, 0 );
-    rd->draw_list_bind_uniform_set( dl, textures_uniform_set, 1 );
-    rd->draw_list_bind_vertex_array( dl, m_vertex_array );
-    rd->draw_list_draw( dl, false, 1 );
-    rd->draw_list_end();
+        // Clear ssao to ao=1.0 (no darkening at discarded/occluded pixels)
+        // Clear bg_depth to 0.0 (no background → Stage 2 depth test won't pass)
+        godot::PackedColorArray clear_colors;
+        clear_colors.push_back( godot::Color( 0, 0, 0, 0 ) ); // beauty: don't care
+        clear_colors.push_back( godot::Color( 1, 0, 0, 1 ) ); // ssao: ao=1
+        clear_colors.push_back( godot::Color( 0, 0, 0, 0 ) ); // bg_depth: 0 = no background
 
-    rd->free_rid( framebuffer );
-    rd->free_rid( textures_uniform_set );
+        int64_t dl = rd->draw_list_begin( stage1_fb, godot::RenderingDevice::DRAW_CLEAR_COLOR_1 | godot::RenderingDevice::DRAW_CLEAR_COLOR_2, clear_colors );
+        rd->draw_list_bind_render_pipeline( dl, m_stage1_pipeline );
+        rd->draw_list_bind_uniform_set( dl, m_stage1_params_uniform_set, 0 );
+        rd->draw_list_bind_uniform_set( dl, stage1_tex_set, 1 );
+        rd->draw_list_bind_vertex_array( dl, m_vertex_array );
+        rd->draw_list_draw( dl, false, 1 );
+        rd->draw_list_end();
+
+        rd->free_rid( stage1_fb );
+        rd->free_rid( stage1_tex_set );
+    }
+
+    // =========================================================================
+    // Stage 2 — background_composite.glsl: beauty → scene color, depth write
+    // =========================================================================
+    {
+        godot::TypedArray<godot::RDUniform> set1;
+        set1.push_back( make_sampled( 0, m_beauty_texture, m_sampler ) );
+        set1.push_back( make_sampled( 1, m_bg_depth_texture, m_sampler ) );
+        godot::RID composite_set = rd->uniform_set_create( set1, m_stage2_shader, 1 );
+
+        godot::TypedArray<godot::RID> fb_atts;
+        fb_atts.push_back( color_tex );
+        fb_atts.push_back( depth_tex );
+        godot::RID framebuffer = rd->framebuffer_create( fb_atts, m_stage2_fb_format );
+
+        int64_t dl = rd->draw_list_begin( framebuffer );
+        rd->draw_list_bind_render_pipeline( dl, m_stage2_pipeline );
+        rd->draw_list_bind_uniform_set( dl, m_stage2_params_uniform_set, 0 );
+        rd->draw_list_bind_uniform_set( dl, composite_set, 1 );
+        rd->draw_list_bind_vertex_array( dl, m_vertex_array );
+        rd->draw_list_draw( dl, false, 1 );
+        rd->draw_list_end();
+
+        rd->free_rid( framebuffer );
+        rd->free_rid( composite_set );
+    }
 }
 
 void MFBackgroundEffect::_bind_methods()

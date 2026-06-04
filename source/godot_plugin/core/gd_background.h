@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/variant/projection.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 
 class MFBackgroundEffect : public godot::CompositorEffect
 {
@@ -29,7 +30,7 @@ class MFBackgroundEffect : public godot::CompositorEffect
     void set_view_params( float uncropped_fov, float uncropped_aspect, godot::Transform3D uncropped_view_mat );
 
   private:
-    // std140-compatible UBO layout (must match background_composite.glsl Params block)
+    // std140-compatible UBO layout (must match Params block in all shaders)
     struct alignas( 16 ) BackgroundParams
     {
         float inv_projection[16];
@@ -47,9 +48,11 @@ class MFBackgroundEffect : public godot::CompositorEffect
     static void pack_projection( const godot::Projection& p, float* out );
     static void pack_transform( const godot::Transform3D& t, float* out );
 
-    void init( godot::RenderingDevice* rd, godot::RID color_tex );
+    void init( godot::RenderingDevice* rd, godot::RID color_tex, godot::RID depth_tex );
+    void create_render_textures( godot::RenderingDevice* rd, godot::Vector2i size );
 
     bool m_initialized = false;
+    godot::PackedByteArray m_params_bytes;
 
     // View state (set by MFLevel::apply_view)
     godot::Ref<godot::ImageTexture> m_color_direct;
@@ -59,13 +62,28 @@ class MFBackgroundEffect : public godot::CompositorEffect
     float m_uncropped_aspect = 1.0f;
     godot::Transform3D m_uncropped_view_mat;
 
-    // RD resources (lifetime = plugin lifetime)
-    godot::RID m_shader;
-    godot::RID m_pipeline;
+    // Shared RD resources (lifetime = plugin lifetime)
     godot::RID m_sampler;
     godot::RID m_params_buffer;
+    godot::RID m_stage1_params_uniform_set; // set 0 for stage 1 (vertex+fragment layout)
+    godot::RID m_stage2_params_uniform_set; // set 0 for stage 2 (fragment-only layout)
     godot::RID m_vertex_buffer;
     godot::RID m_vertex_array;
-    godot::RID m_params_uniform_set;
-    int64_t m_framebuffer_format = -1;
+    int64_t m_vertex_format = -1;
+
+    // Stage 1 — background render (beauty + ssao color outputs, no depth write)
+    godot::RID m_stage1_shader;
+    godot::RID m_stage1_pipeline;
+    int64_t m_stage1_fb_format = -1; // probed from [beauty_tex, ssao_tex]
+
+    // Stage 2 — final composite render (depth write)
+    godot::RID m_stage2_shader;
+    godot::RID m_stage2_pipeline;
+    int64_t m_stage2_fb_format = -1; // probed from [color_tex, depth_tex]
+
+    // Intermediate viewport-sized textures (reallocated on viewport resize)
+    godot::RID m_beauty_texture;
+    godot::RID m_ssao_texture;
+    godot::RID m_bg_depth_texture; // R32F clip-space depth from Stage 1
+    godot::Vector2i m_intermediate_size;
 };
