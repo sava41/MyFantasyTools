@@ -4,17 +4,16 @@
 
 # My Fantasy Tools
 
-A pipeline for making pre-rendered background, fixed-perspective camera games like PS1 Resident Evil and Final Fantasy. End-to-end tooling from background creation in Blender to level loading in a game engine.
+A pipeline for making pre-rendered background, fixed-perspective camera games like PS1 Resident Evil and Final Fantasy. End-to-end tooling from background scene creation to level loading in a game engine.
 
 ![Example Video](docs/demo.avif)
 
 ## Features
 
-- Blender plugin for defining cameras, navmesh, shadow lights, and render settings in one panel
-- Camera rotation bounds system — author the allowed pan/tilt range per view and automatically determine the required background render size
-- Background rendering pipeline that bakes depth and lighting data alongside the beauty image
-- `.mflevel` file format — a single file containing all scene data for a level
-- Godot 4 plugin with an `MFLevel` node for importing and playing back levels
+- Blender plugin for defining cameras, navmesh, shadow lights, and render settings
+- Camera rotation bounds system: author the allowed pan/tilt range per view and automatically determine the required background render size
+- Background rendering pipeline that bakes all necessary data and outputs a single `.mflevel` file containing all data for a level
+- Godot plugin with an `MFLevel` node 3d for adding pre-rendered backgrounds to your scene tree
 - C++ library for reading `.mflevel` files in any engine
 
 ## Getting Started
