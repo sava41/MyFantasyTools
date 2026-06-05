@@ -30,8 +30,11 @@ class MFManager : public godot::Object
 
     struct ViewCache
     {
-        godot::Ref<godot::Image> color_direct;
-        godot::Ref<godot::Image> color_indirect;
+        godot::Ref<godot::Image> direct_diffuse;
+        godot::Ref<godot::Image> direct_specular;
+        godot::Ref<godot::Image> indirect_diffuse;
+        godot::Ref<godot::Image> indirect_specular;
+        godot::Ref<godot::Image> normal;
         godot::Ref<godot::Image> depth;
         godot::Ref<godot::Image> env;
     };

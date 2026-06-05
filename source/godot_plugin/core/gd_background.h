@@ -24,7 +24,11 @@ class MFBackgroundEffect : public godot::CompositorEffect
 
     void _render_callback( int effect_callback_type, godot::RenderData* render_data ) override;
 
-    void set_view_textures( godot::Ref<godot::ImageTexture> color_direct, godot::Ref<godot::ImageTexture> color_indirect,
+    void set_view_textures( godot::Ref<godot::ImageTexture> direct_diffuse,
+                            godot::Ref<godot::ImageTexture> direct_specular,
+                            godot::Ref<godot::ImageTexture> indirect_diffuse,
+                            godot::Ref<godot::ImageTexture> indirect_specular,
+                            godot::Ref<godot::ImageTexture> normal_baked,
                             godot::Ref<godot::ImageTexture> depth_baked );
 
     void set_view_params( float uncropped_fov, float uncropped_aspect, godot::Transform3D uncropped_view_mat );
@@ -55,8 +59,11 @@ class MFBackgroundEffect : public godot::CompositorEffect
     godot::PackedByteArray m_params_bytes;
 
     // View state (set by MFLevel::apply_view)
-    godot::Ref<godot::ImageTexture> m_color_direct;
-    godot::Ref<godot::ImageTexture> m_color_indirect;
+    godot::Ref<godot::ImageTexture> m_direct_diffuse;
+    godot::Ref<godot::ImageTexture> m_direct_specular;
+    godot::Ref<godot::ImageTexture> m_indirect_diffuse;
+    godot::Ref<godot::ImageTexture> m_indirect_specular;
+    godot::Ref<godot::ImageTexture> m_normal_baked;
     godot::Ref<godot::ImageTexture> m_depth_baked;
     float m_uncropped_fov    = 1.0f;
     float m_uncropped_aspect = 1.0f;

@@ -71,8 +71,13 @@ class MFT_OT_Export(Operator):
                 image_blob = bytearray()
                 image_entries = {}  # {view_name: {type_name: (offset, size, res_x, res_y, channels)}}
 
-                IMAGE_TYPES = ['ColorDirect', 'ColorIndirect', 'Depth', 'Environment']
-                IMAGE_CHANNELS = {'ColorDirect': 3, 'ColorIndirect': 3, 'Depth': 1, 'Environment': 3}
+                IMAGE_TYPES = ['DirectDiffuse', 'DirectSpecular', 'IndirectDiffuse', 'IndirectSpecular',
+                               'Normal', 'Depth', 'Environment']
+                IMAGE_CHANNELS = {
+                    'DirectDiffuse': 3, 'DirectSpecular': 3,
+                    'IndirectDiffuse': 3, 'IndirectSpecular': 3,
+                    'Normal': 3, 'Depth': 1, 'Environment': 3
+                }
                 for view in self._views:
                     entries = {}
                     main_res_x = int(view._uncropped_res_x)

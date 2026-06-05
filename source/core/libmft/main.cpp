@@ -15,15 +15,19 @@ namespace data = mft::data;
 // Image-type table shared by all modes
 // --------------------------------------------------------------------------
 
-static constexpr int NUM_IMAGE_TYPES = 4;
+static constexpr int NUM_IMAGE_TYPES = 7;
 
 static const char* IMAGE_TYPE_NAMES[NUM_IMAGE_TYPES] = {
-    "ColorDirect", "ColorIndirect", "Depth", "Environment",
+    "DirectDiffuse", "DirectSpecular", "IndirectDiffuse", "IndirectSpecular",
+    "Normal", "Depth", "Environment",
 };
 
 static const mft::ImageType IMAGE_TYPES[NUM_IMAGE_TYPES] = {
-    mft::ImageType::ColorDirect,
-    mft::ImageType::ColorIndirect,
+    mft::ImageType::DirectDiffuse,
+    mft::ImageType::DirectSpecular,
+    mft::ImageType::IndirectDiffuse,
+    mft::ImageType::IndirectSpecular,
+    mft::ImageType::Normal,
     mft::ImageType::Depth,
     mft::ImageType::Environment,
 };
@@ -32,10 +36,13 @@ static const data::ImageEntry* get_fbs_entry( const data::View* view, mft::Image
 {
     switch( type )
     {
-    case mft::ImageType::ColorDirect:   return view->color_direct();
-    case mft::ImageType::ColorIndirect: return view->color_indirect();
-    case mft::ImageType::Depth:         return view->depth();
-    case mft::ImageType::Environment:   return view->environment();
+    case mft::ImageType::DirectDiffuse:   return view->direct_diffuse();
+    case mft::ImageType::DirectSpecular:  return view->direct_specular();
+    case mft::ImageType::IndirectDiffuse: return view->indirect_diffuse();
+    case mft::ImageType::IndirectSpecular:return view->indirect_specular();
+    case mft::ImageType::Normal:          return view->normal();
+    case mft::ImageType::Depth:           return view->depth();
+    case mft::ImageType::Environment:     return view->environment();
     }
     return nullptr;
 }

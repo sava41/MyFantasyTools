@@ -51,8 +51,11 @@ class CompositeManager:
     def set_main_output(self, output_path):
 
         self._output_node.file_output_items.clear()
-        self._output_node.file_output_items.new("RGBA", "ColorDirect#")
-        self._output_node.file_output_items.new("RGBA", "ColorIndirect#")
+        self._output_node.file_output_items.new("RGBA", "DirectDiffuse#")
+        self._output_node.file_output_items.new("RGBA", "DirectSpecular#")
+        self._output_node.file_output_items.new("RGBA", "IndirectDiffuse#")
+        self._output_node.file_output_items.new("RGBA", "IndirectSpecular#")
+        self._output_node.file_output_items.new("RGBA", "Normal#")
 
         # add depth slot with BW color mode
         self._output_node.file_output_items.new("FLOAT", "Depth#")
@@ -73,137 +76,112 @@ class CompositeManager:
         preview_slot.format.color_mode = "RGB"
         preview_slot.format.color_depth = "8"
 
-        # Create denoise nodes for ColorDirect and ColorIndirect
-        denoise_direct_node = self._tree.nodes.new(type="CompositorNodeDenoise")
-        denoise_indirect_node = self._tree.nodes.new(type="CompositorNodeDenoise")
+        # Denoise nodes — one per denoised output pass
+        denoise_direct_diffuse    = self._tree.nodes.new(type="CompositorNodeDenoise")
+        denoise_direct_specular   = self._tree.nodes.new(type="CompositorNodeDenoise")
+        denoise_indirect_diffuse  = self._tree.nodes.new(type="CompositorNodeDenoise")
+        denoise_indirect_specular = self._tree.nodes.new(type="CompositorNodeDenoise")
 
-        # Create nodes for ColorDirect calculation
-        # ColorDirect = DiffuseDirect * DiffuseColor + GlossyDirect * GlossyColor + TransmissionDirect * TransmissionColor
-
-        # Diffuse direct component
+        # ---- DirectDiffuse = DiffuseDirect×DiffuseColor + TransmissionDirect×TransmissionColor ----
         diffuse_direct_mul = self._tree.nodes.new(type="ShaderNodeMix")
         diffuse_direct_mul.data_type = 'RGBA'
         diffuse_direct_mul.blend_type = "MULTIPLY"
-        diffuse_direct_mul.inputs[0].default_value = 1.0  # Factor
+        diffuse_direct_mul.inputs[0].default_value = 1.0
 
-        # Glossy direct component
-        glossy_direct_mul = self._tree.nodes.new(type="ShaderNodeMix")
-        glossy_direct_mul.data_type = 'RGBA'
-        glossy_direct_mul.blend_type = "MULTIPLY"
-        glossy_direct_mul.inputs[0].default_value = 1.0  # Factor
-
-        # Transmission direct component
         transmission_direct_mul = self._tree.nodes.new(type="ShaderNodeMix")
         transmission_direct_mul.data_type = 'RGBA'
         transmission_direct_mul.blend_type = "MULTIPLY"
-        transmission_direct_mul.inputs[0].default_value = 1.0  # Factor
+        transmission_direct_mul.inputs[0].default_value = 1.0
 
-        # Sum diffuse + glossy for direct
-        direct_sum1 = self._tree.nodes.new(type="ShaderNodeMix")
-        direct_sum1.data_type = 'RGBA'
-        direct_sum1.blend_type = "ADD"
-        direct_sum1.inputs[0].default_value = 1.0  # Factor
+        direct_diffuse_add = self._tree.nodes.new(type="ShaderNodeMix")
+        direct_diffuse_add.data_type = 'RGBA'
+        direct_diffuse_add.blend_type = "ADD"
+        direct_diffuse_add.inputs[0].default_value = 1.0
 
-        # Sum (diffuse + glossy) + transmission for direct
-        direct_sum2 = self._tree.nodes.new(type="ShaderNodeMix")
-        direct_sum2.data_type = 'RGBA'
-        direct_sum2.blend_type = "ADD"
-        direct_sum2.inputs[0].default_value = 1.0  # Factor
+        # ---- DirectSpecular = GlossyDirect×GlossyColor ----
+        glossy_direct_mul = self._tree.nodes.new(type="ShaderNodeMix")
+        glossy_direct_mul.data_type = 'RGBA'
+        glossy_direct_mul.blend_type = "MULTIPLY"
+        glossy_direct_mul.inputs[0].default_value = 1.0
 
-        # Create nodes for ColorIndirect calculation
-        # ColorIndirect = DiffuseIndirect * DiffuseColor + GlossyIndirect * GlossyColor + TransmissionIndirect * TransmissionColor
-
-        # Diffuse indirect component
+        # ---- IndirectDiffuse = DiffuseIndirect×DiffuseColor + TransmissionIndirect×TransmissionColor + Emission + Environment ----
         diffuse_indirect_mul = self._tree.nodes.new(type="ShaderNodeMix")
         diffuse_indirect_mul.data_type = 'RGBA'
         diffuse_indirect_mul.blend_type = "MULTIPLY"
-        diffuse_indirect_mul.inputs[0].default_value = 1.0  # Factor
+        diffuse_indirect_mul.inputs[0].default_value = 1.0
 
-        # Glossy indirect component
-        glossy_indirect_mul = self._tree.nodes.new(type="ShaderNodeMix")
-        glossy_indirect_mul.data_type = 'RGBA'
-        glossy_indirect_mul.blend_type = "MULTIPLY"
-        glossy_indirect_mul.inputs[0].default_value = 1.0  # Factor
-
-        # Transmission indirect component
         transmission_indirect_mul = self._tree.nodes.new(type="ShaderNodeMix")
         transmission_indirect_mul.data_type = 'RGBA'
         transmission_indirect_mul.blend_type = "MULTIPLY"
-        transmission_indirect_mul.inputs[0].default_value = 1.0  # Factor
+        transmission_indirect_mul.inputs[0].default_value = 1.0
 
-        # Sum diffuse + glossy for indirect
-        indirect_sum1 = self._tree.nodes.new(type="ShaderNodeMix")
-        indirect_sum1.data_type = 'RGBA'
-        indirect_sum1.blend_type = "ADD"
-        indirect_sum1.inputs[0].default_value = 1.0  # Factor
+        indirect_diffuse_add1 = self._tree.nodes.new(type="ShaderNodeMix")
+        indirect_diffuse_add1.data_type = 'RGBA'
+        indirect_diffuse_add1.blend_type = "ADD"
+        indirect_diffuse_add1.inputs[0].default_value = 1.0
 
-        # Sum (diffuse + glossy) + transmission for indirect
-        indirect_sum2 = self._tree.nodes.new(type="ShaderNodeMix")
-        indirect_sum2.data_type = 'RGBA'
-        indirect_sum2.blend_type = "ADD"
-        indirect_sum2.inputs[0].default_value = 1.0  # Factor
+        indirect_diffuse_add2 = self._tree.nodes.new(type="ShaderNodeMix")
+        indirect_diffuse_add2.data_type = 'RGBA'
+        indirect_diffuse_add2.blend_type = "ADD"
+        indirect_diffuse_add2.inputs[0].default_value = 1.0
 
-        # Add emission to indirect
-        indirect_emission_add = self._tree.nodes.new(type="ShaderNodeMix")
-        indirect_emission_add.data_type = 'RGBA'
-        indirect_emission_add.blend_type = "ADD"
-        indirect_emission_add.inputs[0].default_value = 1.0  # Factor
+        indirect_diffuse_add3 = self._tree.nodes.new(type="ShaderNodeMix")
+        indirect_diffuse_add3.data_type = 'RGBA'
+        indirect_diffuse_add3.blend_type = "ADD"
+        indirect_diffuse_add3.inputs[0].default_value = 1.0
 
-        # Add environment to indirect
-        indirect_environment_add = self._tree.nodes.new(type="ShaderNodeMix")
-        indirect_environment_add.data_type = 'RGBA'
-        indirect_environment_add.blend_type = "ADD"
-        indirect_environment_add.inputs[0].default_value = 1.0  # Factor
+        # ---- IndirectSpecular = GlossyIndirect×GlossyColor ----
+        glossy_indirect_mul = self._tree.nodes.new(type="ShaderNodeMix")
+        glossy_indirect_mul.data_type = 'RGBA'
+        glossy_indirect_mul.blend_type = "MULTIPLY"
+        glossy_indirect_mul.inputs[0].default_value = 1.0
 
         # link nodes
         links = self._tree.links
         links.clear()
 
-        # ColorDirect links
+        # DirectDiffuse links
         links.new(self._layer_node.outputs.get("Diffuse Direct"), diffuse_direct_mul.inputs[6])
         links.new(self._layer_node.outputs.get("Diffuse Color"), diffuse_direct_mul.inputs[7])
-
-        links.new(self._layer_node.outputs.get("Glossy Direct"), glossy_direct_mul.inputs[6])
-        links.new(self._layer_node.outputs.get("Glossy Color"), glossy_direct_mul.inputs[7])
-
         links.new(self._layer_node.outputs.get("Transmission Direct"), transmission_direct_mul.inputs[6])
         links.new(self._layer_node.outputs.get("Transmission Color"), transmission_direct_mul.inputs[7])
+        links.new(diffuse_direct_mul.outputs[2], direct_diffuse_add.inputs[6])
+        links.new(transmission_direct_mul.outputs[2], direct_diffuse_add.inputs[7])
+        links.new(direct_diffuse_add.outputs[2], denoise_direct_diffuse.inputs[0])
+        links.new(self._layer_node.outputs.get("Normal"), denoise_direct_diffuse.inputs[2])
+        links.new(denoise_direct_diffuse.outputs[0], self._output_node.inputs.get("DirectDiffuse#"))
 
-        links.new(diffuse_direct_mul.outputs[2], direct_sum1.inputs[6])
-        links.new(glossy_direct_mul.outputs[2], direct_sum1.inputs[7])
-        links.new(direct_sum1.outputs[2], direct_sum2.inputs[6])
-        links.new(transmission_direct_mul.outputs[2], direct_sum2.inputs[7])
+        # DirectSpecular links
+        links.new(self._layer_node.outputs.get("Glossy Direct"), glossy_direct_mul.inputs[6])
+        links.new(self._layer_node.outputs.get("Glossy Color"), glossy_direct_mul.inputs[7])
+        links.new(glossy_direct_mul.outputs[2], denoise_direct_specular.inputs[0])
+        links.new(self._layer_node.outputs.get("Normal"), denoise_direct_specular.inputs[2])
+        links.new(denoise_direct_specular.outputs[0], self._output_node.inputs.get("DirectSpecular#"))
 
-        # Denoise ColorDirect
-        links.new(direct_sum2.outputs[2], denoise_direct_node.inputs[0])
-        links.new(self._layer_node.outputs.get("Normal"), denoise_direct_node.inputs[2])
-        links.new(denoise_direct_node.outputs[0], self._output_node.inputs.get("ColorDirect#"))
-
-        # ColorIndirect links
+        # IndirectDiffuse links
         links.new(self._layer_node.outputs.get("Diffuse Indirect"), diffuse_indirect_mul.inputs[6])
         links.new(self._layer_node.outputs.get("Diffuse Color"), diffuse_indirect_mul.inputs[7])
-
-        links.new(self._layer_node.outputs.get("Glossy Indirect"), glossy_indirect_mul.inputs[6])
-        links.new(self._layer_node.outputs.get("Glossy Color"), glossy_indirect_mul.inputs[7])
-
         links.new(self._layer_node.outputs.get("Transmission Indirect"), transmission_indirect_mul.inputs[6])
         links.new(self._layer_node.outputs.get("Transmission Color"), transmission_indirect_mul.inputs[7])
+        links.new(diffuse_indirect_mul.outputs[2], indirect_diffuse_add1.inputs[6])
+        links.new(transmission_indirect_mul.outputs[2], indirect_diffuse_add1.inputs[7])
+        links.new(indirect_diffuse_add1.outputs[2], indirect_diffuse_add2.inputs[6])
+        links.new(self._layer_node.outputs.get("Emission"), indirect_diffuse_add2.inputs[7])
+        links.new(indirect_diffuse_add2.outputs[2], indirect_diffuse_add3.inputs[6])
+        links.new(self._layer_node.outputs.get("Environment"), indirect_diffuse_add3.inputs[7])
+        links.new(indirect_diffuse_add3.outputs[2], denoise_indirect_diffuse.inputs[0])
+        links.new(self._layer_node.outputs.get("Normal"), denoise_indirect_diffuse.inputs[2])
+        links.new(denoise_indirect_diffuse.outputs[0], self._output_node.inputs.get("IndirectDiffuse#"))
 
-        links.new(diffuse_indirect_mul.outputs[2], indirect_sum1.inputs[6])
-        links.new(glossy_indirect_mul.outputs[2], indirect_sum1.inputs[7])
-        links.new(indirect_sum1.outputs[2], indirect_sum2.inputs[6])
-        links.new(transmission_indirect_mul.outputs[2], indirect_sum2.inputs[7])
+        # IndirectSpecular links
+        links.new(self._layer_node.outputs.get("Glossy Indirect"), glossy_indirect_mul.inputs[6])
+        links.new(self._layer_node.outputs.get("Glossy Color"), glossy_indirect_mul.inputs[7])
+        links.new(glossy_indirect_mul.outputs[2], denoise_indirect_specular.inputs[0])
+        links.new(self._layer_node.outputs.get("Normal"), denoise_indirect_specular.inputs[2])
+        links.new(denoise_indirect_specular.outputs[0], self._output_node.inputs.get("IndirectSpecular#"))
 
-        links.new(indirect_sum2.outputs[2], indirect_emission_add.inputs[6])
-        links.new(self._layer_node.outputs.get("Emission"), indirect_emission_add.inputs[7])
-
-        links.new(indirect_emission_add.outputs[2], indirect_environment_add.inputs[6])
-        links.new(self._layer_node.outputs.get("Environment"), indirect_environment_add.inputs[7])
-
-        # Denoise ColorIndirect
-        links.new(indirect_environment_add.outputs[2], denoise_indirect_node.inputs[0])
-        links.new(self._layer_node.outputs.get("Normal"), denoise_indirect_node.inputs[2])
-        links.new(denoise_indirect_node.outputs[0], self._output_node.inputs.get("ColorIndirect#"))
+        # Normal (raw, no denoise)
+        links.new(self._layer_node.outputs.get("Normal"), self._output_node.inputs.get("Normal#"))
 
         # Other outputs
         links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))

@@ -70,15 +70,17 @@ table View {
   adjacent_views: [uint16];
 
   // Image entries for the .mflevel binary format (byte offsets into the image blob).
-  color_direct:    ImageEntry;
-  color_indirect:  ImageEntry;
-  depth:           ImageEntry;
-  environment:     ImageEntry;
+  depth:            ImageEntry;
+  environment:      ImageEntry;
+  direct_diffuse:   ImageEntry;
+  direct_specular:  ImageEntry;
+  indirect_diffuse: ImageEntry;
+  indirect_specular:ImageEntry;
+  normal:           ImageEntry;
 }
 
 table Level {
   name: string;
-  data_path: string;     // legacy: relative path to image directory used by .level format
   target_res_x: uint16;
   target_res_y: uint16;
   views: [View];

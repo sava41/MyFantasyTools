@@ -14,8 +14,11 @@ namespace mft
 
     enum class ImageType
     {
-        ColorDirect,
-        ColorIndirect,
+        DirectDiffuse,
+        DirectSpecular,
+        IndirectDiffuse,
+        IndirectSpecular,
+        Normal,
         Depth,
         Environment,
     };

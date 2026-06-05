@@ -1,6 +1,7 @@
 #include "gd_background.h"
 
-#include <cassert>
+#include "assertion.h"
+
 #include <godot_cpp/classes/rd_pipeline_color_blend_state.hpp>
 #include <godot_cpp/classes/rd_pipeline_color_blend_state_attachment.hpp>
 #include <godot_cpp/classes/rd_pipeline_depth_stencil_state.hpp>
@@ -91,12 +92,19 @@ MFBackgroundEffect::~MFBackgroundEffect()
     free_if_valid( rd, m_stage2_shader );
 }
 
-void MFBackgroundEffect::set_view_textures( godot::Ref<godot::ImageTexture> color_direct, godot::Ref<godot::ImageTexture> color_indirect,
+void MFBackgroundEffect::set_view_textures( godot::Ref<godot::ImageTexture> direct_diffuse,
+                                            godot::Ref<godot::ImageTexture> direct_specular,
+                                            godot::Ref<godot::ImageTexture> indirect_diffuse,
+                                            godot::Ref<godot::ImageTexture> indirect_specular,
+                                            godot::Ref<godot::ImageTexture> normal_baked,
                                             godot::Ref<godot::ImageTexture> depth_baked )
 {
-    m_color_direct   = color_direct;
-    m_color_indirect = color_indirect;
-    m_depth_baked    = depth_baked;
+    m_direct_diffuse    = direct_diffuse;
+    m_direct_specular   = direct_specular;
+    m_indirect_diffuse  = indirect_diffuse;
+    m_indirect_specular = indirect_specular;
+    m_normal_baked      = normal_baked;
+    m_depth_baked       = depth_baked;
 }
 
 void MFBackgroundEffect::set_view_params( float uncropped_fov, float uncropped_aspect, godot::Transform3D uncropped_view_mat )
@@ -144,7 +152,7 @@ void MFBackgroundEffect::init( godot::RenderingDevice* rd, godot::RID color_tex,
     m_stage1_shader = load_shader( rd, "res://addons/mft_godot_plugin/background.glsl" );
     m_stage2_shader = load_shader( rd, "res://addons/mft_godot_plugin/background_composite.glsl" );
 
-    assert( m_stage1_shader.is_valid() && m_stage2_shader.is_valid() );
+    assertion( m_stage1_shader.is_valid() && m_stage2_shader.is_valid(), "shader loading failed" );
 
     // ---- Shared sampler ----
     godot::Ref<godot::RDSamplerState> ss;
@@ -298,20 +306,22 @@ void MFBackgroundEffect::create_render_textures( godot::RenderingDevice* rd, god
 
 void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* render_data )
 {
-    if( !m_color_direct.is_valid() || !m_color_indirect.is_valid() || !m_depth_baked.is_valid() )
+    if( !m_direct_diffuse.is_valid() || !m_direct_specular.is_valid() ||
+        !m_indirect_diffuse.is_valid() || !m_indirect_specular.is_valid() ||
+        !m_normal_baked.is_valid() || !m_depth_baked.is_valid() )
     {
         return;
     }
 
-    assert( render_data );
+    assertion( render_data, "render_data is null" );
     godot::RenderingDevice* rd = godot::RenderingServer::get_singleton()->get_rendering_device();
-    assert( rd );
+    assertion( rd, "rendering device is null" );
 
     godot::Ref<godot::RenderSceneBuffersRD> buffers = render_data->get_render_scene_buffers();
-    assert( buffers.is_valid() );
+    assertion( buffers.is_valid(), "render scene buffers unavailable" );
 
     godot::Vector2i size = buffers->get_internal_size();
-    assert( size.x > 0 && size.y > 0 );
+    assertion( size.x > 0 && size.y > 0, "invalid render size" );
 
     godot::RID color_tex = buffers->get_color_texture();
     godot::RID depth_tex = buffers->get_depth_texture();
@@ -345,19 +355,30 @@ void MFBackgroundEffect::_render_callback( int /*type*/, godot::RenderData* rend
     p.screen_h         = size.y;
     rd->buffer_update( m_params_buffer, 0, m_params_bytes.size(), m_params_bytes );
 
-    godot::RenderingServer* rs   = godot::RenderingServer::get_singleton();
-    godot::RID color_direct_rd   = rs->texture_get_rd_texture( m_color_direct->get_rid() );
-    godot::RID color_indirect_rd = rs->texture_get_rd_texture( m_color_indirect->get_rid() );
-    godot::RID depth_baked_rd    = rs->texture_get_rd_texture( m_depth_baked->get_rid() );
+    godot::RenderingServer* rs        = godot::RenderingServer::get_singleton();
+    godot::RID direct_diffuse_rd    = rs->texture_get_rd_texture( m_direct_diffuse->get_rid() );
+    godot::RID direct_specular_rd   = rs->texture_get_rd_texture( m_direct_specular->get_rid() );
+    godot::RID indirect_diffuse_rd  = rs->texture_get_rd_texture( m_indirect_diffuse->get_rid() );
+    godot::RID indirect_specular_rd = rs->texture_get_rd_texture( m_indirect_specular->get_rid() );
+    godot::RID normal_baked_rd      = rs->texture_get_rd_texture( m_normal_baked->get_rid() );
+    godot::RID depth_baked_rd       = rs->texture_get_rd_texture( m_depth_baked->get_rid() );
 
     // =========================================================================
     // Stage 1 — background.glsl: beauty + ssao + bg_depth outputs
     // =========================================================================
     {
-        godot::RID stage1_tex_set = rd->uniform_set_create( godot::TypedArray<godot::RDUniform>( godot::Array::make(
-                                                                make_sampled( 0, color_direct_rd, m_sampler ), make_sampled( 1, color_indirect_rd, m_sampler ),
-                                                                make_sampled( 2, depth_baked_rd, m_sampler ), make_sampled( 3, depth_tex, m_sampler ) ) ),
-                                                            m_stage1_shader, 1 );
+        godot::RID stage1_tex_set = rd->uniform_set_create(
+            godot::TypedArray<godot::RDUniform>( godot::Array::make(
+                make_sampled( 0, direct_diffuse_rd,    m_sampler ),
+                make_sampled( 1, direct_specular_rd,   m_sampler ),
+                make_sampled( 2, indirect_diffuse_rd,  m_sampler ),
+                make_sampled( 3, indirect_specular_rd, m_sampler ),
+                make_sampled( 4, depth_baked_rd,       m_sampler ),
+                make_sampled( 5, normal_baked_rd,      m_sampler ),
+                make_sampled( 6, depth_tex,            m_sampler ),
+                make_sampled( 7, color_tex,            m_sampler )
+            ) ),
+            m_stage1_shader, 1 );
 
         godot::RID stage1_fb = rd->framebuffer_create(
             godot::TypedArray<godot::RID>( godot::Array::make( m_beauty_texture, m_ssao_texture, m_bg_depth_texture ) ), m_stage1_fb_format );

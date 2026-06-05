@@ -239,8 +239,11 @@ bool MFLevel::apply_view( int view_id )
     const mft::Level& level = MFManager::get()->get_level();
     const auto* view        = level.fbs()->views()->Get( view_id );
 
-    m_background_effect->set_view_textures( godot::ImageTexture::create_from_image( cache->color_direct ),
-                                            godot::ImageTexture::create_from_image( cache->color_indirect ),
+    m_background_effect->set_view_textures( godot::ImageTexture::create_from_image( cache->direct_diffuse ),
+                                            godot::ImageTexture::create_from_image( cache->direct_specular ),
+                                            godot::ImageTexture::create_from_image( cache->indirect_diffuse ),
+                                            godot::ImageTexture::create_from_image( cache->indirect_specular ),
+                                            godot::ImageTexture::create_from_image( cache->normal ),
                                             godot::ImageTexture::create_from_image( cache->depth ) );
 
     m_game_camera->set_current( true );

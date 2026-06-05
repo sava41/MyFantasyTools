@@ -1,5 +1,6 @@
 #include "gd_manager.h"
 
+#include "assertion.h"
 #include "jxl.h"
 
 #include <fstream>
@@ -153,17 +154,25 @@ void MFManager::begin_load_view( int view_index )
 
     const auto* view = m_level.fbs()->views()->Get( view_index );
 
-    const auto* cd  = view->color_direct();
-    const auto* ci  = view->color_indirect();
+    const auto* dd  = view->direct_diffuse();
+    const auto* ds  = view->direct_specular();
+    const auto* id  = view->indirect_diffuse();
+    const auto* is  = view->indirect_specular();
+    const auto* nm  = view->normal();
     const auto* dep = view->depth();
     const auto* env = view->environment();
 
+    assertion( dd && ds && id && is && nm && dep && env, "view is missing image entries — level must be re-exported" );
+
     // Allocate Images on the main thread; the worker writes into their raw buffers.
-    auto cache            = std::make_unique<ViewCache>();
-    cache->color_direct   = godot::Image::create( cd->res_x(), cd->res_y(), false, channels_to_format( cd->channels() ) );
-    cache->color_indirect = godot::Image::create( ci->res_x(), ci->res_y(), false, channels_to_format( ci->channels() ) );
-    cache->depth          = godot::Image::create( dep->res_x(), dep->res_y(), false, channels_to_format( dep->channels() ) );
-    cache->env            = godot::Image::create( env->res_x(), env->res_y(), false, channels_to_format( env->channels() ) );
+    auto cache               = std::make_unique<ViewCache>();
+    cache->direct_diffuse    = godot::Image::create( dd->res_x(), dd->res_y(), false, channels_to_format( dd->channels() ) );
+    cache->direct_specular   = godot::Image::create( ds->res_x(), ds->res_y(), false, channels_to_format( ds->channels() ) );
+    cache->indirect_diffuse  = godot::Image::create( id->res_x(), id->res_y(), false, channels_to_format( id->channels() ) );
+    cache->indirect_specular = godot::Image::create( is->res_x(), is->res_y(), false, channels_to_format( is->channels() ) );
+    cache->normal            = godot::Image::create( nm->res_x(), nm->res_y(), false, channels_to_format( nm->channels() ) );
+    cache->depth             = godot::Image::create( dep->res_x(), dep->res_y(), false, channels_to_format( dep->channels() ) );
+    cache->env               = godot::Image::create( env->res_x(), env->res_y(), false, channels_to_format( env->channels() ) );
 
     // Pre-extract all file offsets and pixel sizes before dispatching — avoids any
     // cross-thread access to the flatbuffer or the Level struct.
@@ -178,10 +187,16 @@ void MFManager::begin_load_view( int view_index )
     };
 
     const std::vector<ImageLoad> loads = {
-        { blob + static_cast<size_t>( cd->offset() ), static_cast<size_t>( cd->size() ), const_cast<uint8_t*>( cache->color_direct->get_data().ptr() ),
-          static_cast<size_t>( cd->res_x() ) * cd->res_y() * cd->channels() * sizeof( float ) },
-        { blob + static_cast<size_t>( ci->offset() ), static_cast<size_t>( ci->size() ), const_cast<uint8_t*>( cache->color_indirect->get_data().ptr() ),
-          static_cast<size_t>( ci->res_x() ) * ci->res_y() * ci->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( dd->offset() ), static_cast<size_t>( dd->size() ), const_cast<uint8_t*>( cache->direct_diffuse->get_data().ptr() ),
+          static_cast<size_t>( dd->res_x() ) * dd->res_y() * dd->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( ds->offset() ), static_cast<size_t>( ds->size() ), const_cast<uint8_t*>( cache->direct_specular->get_data().ptr() ),
+          static_cast<size_t>( ds->res_x() ) * ds->res_y() * ds->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( id->offset() ), static_cast<size_t>( id->size() ), const_cast<uint8_t*>( cache->indirect_diffuse->get_data().ptr() ),
+          static_cast<size_t>( id->res_x() ) * id->res_y() * id->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( is->offset() ), static_cast<size_t>( is->size() ), const_cast<uint8_t*>( cache->indirect_specular->get_data().ptr() ),
+          static_cast<size_t>( is->res_x() ) * is->res_y() * is->channels() * sizeof( float ) },
+        { blob + static_cast<size_t>( nm->offset() ), static_cast<size_t>( nm->size() ), const_cast<uint8_t*>( cache->normal->get_data().ptr() ),
+          static_cast<size_t>( nm->res_x() ) * nm->res_y() * nm->channels() * sizeof( float ) },
         { blob + static_cast<size_t>( dep->offset() ), static_cast<size_t>( dep->size() ), const_cast<uint8_t*>( cache->depth->get_data().ptr() ),
           static_cast<size_t>( dep->res_x() ) * dep->res_y() * dep->channels() * sizeof( float ) },
         { blob + static_cast<size_t>( env->offset() ), static_cast<size_t>( env->size() ), const_cast<uint8_t*>( cache->env->get_data().ptr() ),

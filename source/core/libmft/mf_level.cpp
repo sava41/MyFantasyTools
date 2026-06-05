@@ -14,14 +14,13 @@ namespace mft
     {
         switch( type )
         {
-        case ImageType::ColorDirect:
-            return view->color_direct();
-        case ImageType::ColorIndirect:
-            return view->color_indirect();
-        case ImageType::Depth:
-            return view->depth();
-        case ImageType::Environment:
-            return view->environment();
+        case ImageType::DirectDiffuse:   return view->direct_diffuse();
+        case ImageType::DirectSpecular:  return view->direct_specular();
+        case ImageType::IndirectDiffuse: return view->indirect_diffuse();
+        case ImageType::IndirectSpecular:return view->indirect_specular();
+        case ImageType::Normal:          return view->normal();
+        case ImageType::Depth:           return view->depth();
+        case ImageType::Environment:     return view->environment();
         }
         return nullptr;
     }

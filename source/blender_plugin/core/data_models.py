@@ -7,7 +7,8 @@ from bpy.props import (
     FloatProperty,
     CollectionProperty,
     IntProperty,
-    FloatVectorProperty
+    FloatVectorProperty,
+    BoolProperty
 )
 
 import bmesh

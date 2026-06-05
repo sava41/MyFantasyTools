@@ -46,10 +46,14 @@ layout(location = 0) out vec4  frag_beauty;    // direct + indirect * ao
 layout(location = 1) out vec4  frag_ssao;      // ao in .r
 layout(location = 2) out float frag_bg_depth;  // background clip-space depth (z/w)
 
-layout(set = 1, binding = 0) uniform sampler2D color_direct_tex;
-layout(set = 1, binding = 1) uniform sampler2D color_indirect_tex;
-layout(set = 1, binding = 2) uniform sampler2D depth_baked_tex;
-layout(set = 1, binding = 3) uniform sampler2D depth_scene_tex;
+layout(set = 1, binding = 0) uniform sampler2D direct_diffuse_tex;
+layout(set = 1, binding = 1) uniform sampler2D direct_specular_tex;
+layout(set = 1, binding = 2) uniform sampler2D indirect_diffuse_tex;
+layout(set = 1, binding = 3) uniform sampler2D indirect_specular_tex;
+layout(set = 1, binding = 4) uniform sampler2D depth_baked_tex;
+layout(set = 1, binding = 5) uniform sampler2D normal_baked_tex;
+layout(set = 1, binding = 6) uniform sampler2D depth_scene_tex;
+layout(set = 1, binding = 7) uniform sampler2D scene_color_tex;
 
 layout(set = 0, binding = 0, std140) uniform Params {
     mat4 inv_projection;
@@ -148,6 +152,36 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_point, vec3 view_normal, flo
     return ao_acc / max(weight_acc, 1e-5);
 }
 
+// ---- SSR ----
+
+const int   SSR_STEPS       = 16;
+const float SSR_STEP_SIZE   = 0.05;
+const float SSR_SPEC_CUTOFF = 0.01;
+
+bool trace_ssr(vec3 view_pos, vec3 view_normal, out vec2 hit_uv) {
+    vec3 view_dir    = normalize(-view_pos);
+    vec3 reflect_dir = reflect(-view_dir, view_normal);
+    vec3 ray_pos     = view_pos + reflect_dir * SSR_STEP_SIZE;
+
+    for (int i = 0; i < SSR_STEPS; i++) {
+        vec4 clip      = params.projection * vec4(ray_pos, 1.0);
+        vec2 screen_uv = clip.xy / clip.w * 0.5 + 0.5;
+
+        if (any(lessThan(screen_uv, vec2(0.0))) || any(greaterThan(screen_uv, vec2(1.0))))
+            break;
+
+        float scene_d = texture(depth_scene_tex, screen_uv).x;
+        float ray_d   = clip.z / clip.w;   // reverse-Z
+
+        if (scene_d > 1e-4 && scene_d > ray_d - 0.02) {
+            hit_uv = screen_uv;
+            return true;
+        }
+        ray_pos += reflect_dir * SSR_STEP_SIZE;
+    }
+    return false;
+}
+
 // ---- Main ----
 
 void main() {
@@ -199,11 +233,26 @@ void main() {
     float jitter = randf(int(gl_FragCoord.x), int(gl_FragCoord.y)) - 0.5;
     float ao     = get_ao(screen_uv, aspect, view_depth_pos.xyz, normal, jitter);
 
-    // ---- Outputs ----
-    vec3 direct   = texture(color_direct_tex,   in_uv).rgb;
-    vec3 indirect = texture(color_indirect_tex, in_uv).rgb;
+    // ---- Baked normal (camera-space XY, reconstruct Z assuming front-facing) ----
+    vec2 n_xy = texture(normal_baked_tex, in_uv).xy;
+    vec3 baked_normal = normalize(vec3(n_xy, sqrt(max(0.0, 1.0 - dot(n_xy, n_xy)))));
 
-    frag_beauty   = vec4(direct + indirect * ao, 1.0);
+    // ---- Per-channel lighting ----
+    vec3 direct_diffuse    = texture(direct_diffuse_tex,    in_uv).rgb;
+    vec3 direct_specular   = texture(direct_specular_tex,   in_uv).rgb;
+    vec3 indirect_diffuse  = texture(indirect_diffuse_tex,  in_uv).rgb;
+    vec3 indirect_specular = texture(indirect_specular_tex, in_uv).rgb;
+
+    // ---- SSR: replace specular with reflected scene geometry color on hit ----
+    vec3 specular = direct_specular + indirect_specular;
+    float spec_lum = dot(specular, vec3(0.2126, 0.7152, 0.0722));
+    if (spec_lum > SSR_SPEC_CUTOFF) {
+        vec2 ssr_uv;
+        if (trace_ssr(view_depth_pos.xyz, baked_normal, ssr_uv))
+            specular = texture(scene_color_tex, ssr_uv).rgb;
+    }
+
+    frag_beauty   = vec4(direct_diffuse + indirect_diffuse * ao + specular, 1.0);
     frag_ssao     = vec4(ao, 0.0, 0.0, 1.0);
     frag_bg_depth = background_depth;
 }

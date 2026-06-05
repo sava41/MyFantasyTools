@@ -38,9 +38,9 @@ def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> b
     """Serialize level data to a FlatBuffer bytearray.
 
     image_entries: optional dict  {view_name: {type_name: (offset, size, res_x, res_y, channels)}}
-        where type_name is one of 'ColorDirect', 'ColorIndirect', 'Depth', 'Environment'
+        where type_name is one of 'DirectDiffuse', 'DirectSpecular', 'IndirectDiffuse',
+        'IndirectSpecular', 'Normal', 'Depth', 'Environment'
         and offset/size are byte positions within the .mflevel image blob.
-        When None the legacy data_path field is written instead.
 
     shadow_lights: optional list of MFT_ShadowLight property-group items whose
         .light field points to a Blender light object.
@@ -111,10 +111,13 @@ def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> b
             ),
         )
         View.AddAdjacentViews(builder, adjacent_views)
-        if 'ColorDirect'   in img_entries: View.AddColorDirect(builder,   img_entries['ColorDirect'])
-        if 'ColorIndirect' in img_entries: View.AddColorIndirect(builder, img_entries['ColorIndirect'])
-        if 'Depth'         in img_entries: View.AddDepth(builder,         img_entries['Depth'])
-        if 'Environment'   in img_entries: View.AddEnvironment(builder,   img_entries['Environment'])
+        if 'Depth'            in img_entries: View.AddDepth(builder,           img_entries['Depth'])
+        if 'Environment'      in img_entries: View.AddEnvironment(builder,     img_entries['Environment'])
+        if 'DirectDiffuse'    in img_entries: View.AddDirectDiffuse(builder,   img_entries['DirectDiffuse'])
+        if 'DirectSpecular'   in img_entries: View.AddDirectSpecular(builder,  img_entries['DirectSpecular'])
+        if 'IndirectDiffuse'  in img_entries: View.AddIndirectDiffuse(builder, img_entries['IndirectDiffuse'])
+        if 'IndirectSpecular' in img_entries: View.AddIndirectSpecular(builder,img_entries['IndirectSpecular'])
+        if 'Normal'           in img_entries: View.AddNormal(builder,          img_entries['Normal'])
         serialized_view = View.End(builder)
         serialized_views.append(serialized_view)
 
@@ -170,8 +173,6 @@ def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> b
     navmesh_tris = builder.EndVector()
 
     level_name = builder.CreateString(navmesh.object.name)
-    # data_path is only needed for the legacy .level format
-    level_data_path = builder.CreateString("./views/") if image_entries is None else None
     level_uuid = builder.CreateString(str(uuid_module.uuid4()))
 
     # Serialize shadow lights
@@ -210,8 +211,6 @@ def serialize_level(navmesh, views, image_entries=None, shadow_lights=None) -> b
     Level.AddNavmeshVerts(builder, navmesh_verts)
     Level.AddNavmeshTris(builder, navmesh_tris)
     Level.AddViews(builder, serialized_views)
-    if level_data_path is not None:
-        Level.AddDataPath(builder, level_data_path)
     Level.AddName(builder, level_name)
     Level.AddTargetResX(builder, 1920)
     Level.AddTargetResY(builder, 1080)
