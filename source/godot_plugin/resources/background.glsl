@@ -154,30 +154,60 @@ float get_ao(vec2 screen_uv, vec2 aspect, vec3 view_point, vec3 view_normal, flo
 
 // ---- SSR ----
 
-const int   SSR_STEPS       = 16;
-const float SSR_STEP_SIZE   = 0.05;
-const float SSR_SPEC_CUTOFF = 0.01;
+const int   SSR_STEPS         = 32;
+const float SSR_STEP_SIZE     = 0.01;  // UV units per step
+const float SSR_MAX_THICKNESS = 0.03;   // max NDC depth behind surface to accept as a hit
+const float SSR_SPEC_CUTOFF   = 0.00;
 
-bool trace_ssr(vec3 view_pos, vec3 view_normal, out vec2 hit_uv) {
+bool trace_ssr(vec3 view_pos, vec3 view_normal, float jitter, out vec2 hit_uv) {
     vec3 view_dir    = normalize(-view_pos);
     vec3 reflect_dir = reflect(-view_dir, view_normal);
-    vec3 ray_pos     = view_pos + reflect_dir * SSR_STEP_SIZE;
+
+    // Reject rays marching toward the camera (reflect_dir.z > 0 in view space).
+    // Such rays can only hit front-faces of geometry to represent back-face reflections,
+    // which are occluded — produces worse artifacts than a miss.
+    if (reflect_dir.z > 0.0) return false;
+
+    // Project the ray origin and one step along the ray into NDC once.
+    // All subsequent steps are linear advances in UV + depth — no per-step matrix multiply.
+    vec4 clip0 = params.projection * vec4(view_pos, 1.0);
+    vec4 clip1 = params.projection * vec4(view_pos + reflect_dir, 1.0);
+    vec3 ndc0  = clip0.xyz / clip0.w;
+    vec3 ndc1  = clip1.xyz / clip1.w;
+
+    vec2 uv0  = ndc0.xy * 0.5 + 0.5;
+    vec2 uv_d = (ndc1.xy - ndc0.xy) * 0.5;  // = uv1 - uv0
+
+    // Chebyshev-normalize so the largest UV component steps exactly SSR_STEP_SIZE per
+    // iteration. This is the max(|dx|, |dy|) normalisation from the article — it prevents
+    // the dominant screen axis from being skipped while the other advances fractionally.
+    float uv_max = max(abs(uv_d.x), abs(uv_d.y));
+    if (uv_max < 1e-6) return false;
+
+    vec2  uv_step    = (uv_d / uv_max) * SSR_STEP_SIZE;
+    float depth_step = ((ndc1.z - ndc0.z) / uv_max) * SSR_STEP_SIZE;
+
+    // Jitter the starting offset per pixel to break up banding into noise.
+    vec2  uv    = uv0 + uv_step * jitter;
+    float ray_d = ndc0.z + depth_step * jitter;
 
     for (int i = 0; i < SSR_STEPS; i++) {
-        vec4 clip      = params.projection * vec4(ray_pos, 1.0);
-        vec2 screen_uv = clip.xy / clip.w * 0.5 + 0.5;
-
-        if (any(lessThan(screen_uv, vec2(0.0))) || any(greaterThan(screen_uv, vec2(1.0))))
+        if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0))))
             break;
 
-        float scene_d = texture(depth_scene_tex, screen_uv).x;
-        float ray_d   = clip.z / clip.w;   // reverse-Z
-
-        if (scene_d > 1e-4 && scene_d > ray_d - 0.02) {
-            hit_uv = screen_uv;
+        float scene_d   = texture(depth_scene_tex, uv).x;
+        // Reverse-Z: scene_d > ray_d means the surface is closer to the near plane than
+        // the ray, i.e. the ray has passed behind the surface — potential hit.
+        // SSR_MAX_THICKNESS upper-bounds how far behind we allow, avoiding false hits
+        // through thin geometry.
+        float thickness = scene_d - ray_d;
+        if (scene_d > 1e-4 && thickness >= 0.0 && thickness < SSR_MAX_THICKNESS) {
+            hit_uv = uv;
             return true;
         }
-        ray_pos += reflect_dir * SSR_STEP_SIZE;
+
+        uv    += uv_step;
+        ray_d += depth_step;
     }
     return false;
 }
@@ -233,9 +263,13 @@ void main() {
     float jitter = randf(int(gl_FragCoord.x), int(gl_FragCoord.y)) - 0.5;
     float ao     = get_ao(screen_uv, aspect, view_depth_pos.xyz, normal, jitter);
 
-    // ---- Baked normal (camera-space XY, reconstruct Z assuming front-facing) ----
-    vec2 n_xy = texture(normal_baked_tex, in_uv).xy;
-    vec3 baked_normal = normalize(vec3(n_xy, sqrt(max(0.0, 1.0 - dot(n_xy, n_xy)))));
+    // ---- Baked normal: octahedral decode (Blender world) → Godot world → view space ----
+    vec2 oct_rg = texture(normal_baked_tex, in_uv).rg;
+    vec2 oct    = oct_rg * 2.0 - 1.0;
+    vec3 n      = normalize(vec3(oct.x, oct.y, 1.0 - abs(oct.x) - abs(oct.y)));
+    // Blender (X right, Y forward, Z up) → Godot (X right, Y up, Z back)
+    vec3 godot_world_normal = vec3(n.x, n.z, -n.y);
+    vec3 baked_normal = normalize(mat3(params.view_matrix) * godot_world_normal);
 
     // ---- Per-channel lighting ----
     vec3 direct_diffuse    = texture(direct_diffuse_tex,    in_uv).rgb;
@@ -243,14 +277,12 @@ void main() {
     vec3 indirect_diffuse  = texture(indirect_diffuse_tex,  in_uv).rgb;
     vec3 indirect_specular = texture(indirect_specular_tex, in_uv).rgb;
 
-    // ---- SSR: replace specular with reflected scene geometry color on hit ----
-    vec3 specular = direct_specular + indirect_specular;
-    float spec_lum = dot(specular, vec3(0.2126, 0.7152, 0.0722));
-    if (spec_lum > SSR_SPEC_CUTOFF) {
-        vec2 ssr_uv;
-        if (trace_ssr(view_depth_pos.xyz, baked_normal, ssr_uv))
-            specular = texture(scene_color_tex, ssr_uv).rgb;
-    }
+    // ---- SSR: replace baked specular with reflected scene color on hit ----
+    float ssr_jitter = randf(int(gl_FragCoord.x), int(gl_FragCoord.y));
+    vec2 ssr_uv;
+    bool ssr_hit = trace_ssr(view_depth_pos.xyz, baked_normal, ssr_jitter, ssr_uv);
+    vec3 specular = ssr_hit ? texture(scene_color_tex, ssr_uv).rgb
+                            : direct_specular + indirect_specular;
 
     frag_beauty   = vec4(direct_diffuse + indirect_diffuse * ao + specular, 1.0);
     frag_ssao     = vec4(ao, 0.0, 0.0, 1.0);

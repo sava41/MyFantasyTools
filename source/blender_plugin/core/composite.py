@@ -180,8 +180,53 @@ class CompositeManager:
         links.new(self._layer_node.outputs.get("Normal"), denoise_indirect_specular.inputs[2])
         links.new(denoise_indirect_specular.outputs[0], self._output_node.inputs.get("IndirectSpecular#"))
 
-        # Normal (raw, no denoise)
-        links.new(self._layer_node.outputs.get("Normal"), self._output_node.inputs.get("Normal#"))
+        # Normal: octahedral encoding of world-space normal (RG=[0,1], B=0).
+        # Implemented inline (no group) using only nodes confirmed to work in compositor trees.
+        # Normal pass is already unit length — no normalize step needed.
+        oct_sep = self._tree.nodes.new(type="ShaderNodeSeparateXYZ")
+        links.new(self._layer_node.outputs.get("Normal"), oct_sep.inputs[0])
+
+        # |x|, |y|, |z|
+        oct_abs_x = self._tree.nodes.new(type="ShaderNodeMath"); oct_abs_x.operation = "ABSOLUTE"
+        oct_abs_y = self._tree.nodes.new(type="ShaderNodeMath"); oct_abs_y.operation = "ABSOLUTE"
+        oct_abs_z = self._tree.nodes.new(type="ShaderNodeMath"); oct_abs_z.operation = "ABSOLUTE"
+        links.new(oct_sep.outputs[0], oct_abs_x.inputs[0])
+        links.new(oct_sep.outputs[1], oct_abs_y.inputs[0])
+        links.new(oct_sep.outputs[2], oct_abs_z.inputs[0])
+
+        # L1 = |x| + |y| + |z|
+        oct_add_xy  = self._tree.nodes.new(type="ShaderNodeMath"); oct_add_xy.operation  = "ADD"
+        oct_add_xyz = self._tree.nodes.new(type="ShaderNodeMath"); oct_add_xyz.operation = "ADD"
+        links.new(oct_abs_x.outputs[0], oct_add_xy.inputs[0])
+        links.new(oct_abs_y.outputs[0], oct_add_xy.inputs[1])
+        links.new(oct_add_xy.outputs[0], oct_add_xyz.inputs[0])
+        links.new(oct_abs_z.outputs[0], oct_add_xyz.inputs[1])
+
+        # px = x/L1, py = y/L1
+        oct_px = self._tree.nodes.new(type="ShaderNodeMath"); oct_px.operation = "DIVIDE"
+        oct_py = self._tree.nodes.new(type="ShaderNodeMath"); oct_py.operation = "DIVIDE"
+        links.new(oct_sep.outputs[0],    oct_px.inputs[0])
+        links.new(oct_add_xyz.outputs[0], oct_px.inputs[1])
+        links.new(oct_sep.outputs[1],    oct_py.inputs[0])
+        links.new(oct_add_xyz.outputs[0], oct_py.inputs[1])
+
+        # Remap [-1, 1] → [0, 1]: val * 0.5 + 0.5
+        # No lower-hemisphere fold — upper-hemisphere-only encoding avoids bilinear seam artifacts.
+        oct_remap_x = self._tree.nodes.new(type="ShaderNodeMath"); oct_remap_x.operation = "MULTIPLY_ADD"
+        oct_remap_x.inputs[1].default_value = 0.5
+        oct_remap_x.inputs[2].default_value = 0.5
+        oct_remap_y = self._tree.nodes.new(type="ShaderNodeMath"); oct_remap_y.operation = "MULTIPLY_ADD"
+        oct_remap_y.inputs[1].default_value = 0.5
+        oct_remap_y.inputs[2].default_value = 0.5
+        links.new(oct_px.outputs[0], oct_remap_x.inputs[0])
+        links.new(oct_py.outputs[0], oct_remap_y.inputs[0])
+
+        # Combine into output: R=oct_x, G=oct_y, B=0
+        oct_comb = self._tree.nodes.new(type="ShaderNodeCombineXYZ")
+        links.new(oct_remap_x.outputs[0], oct_comb.inputs[0])
+        links.new(oct_remap_y.outputs[0], oct_comb.inputs[1])
+        # Z disconnected → 0.0
+        links.new(oct_comb.outputs[0], self._output_node.inputs.get("Normal#"))
 
         # Other outputs
         links.new(self._layer_node.outputs.get("Depth"), self._output_node.inputs.get("Depth#"))
